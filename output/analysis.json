@@ -1,0 +1,93 @@
+{
+    "version": "1.0",
+    "timestamp": "2026-01-30T22:58:00Z",
+    "imageDimensions": {
+        "width": 400,
+        "height": 640
+    },
+    "elements": [
+        {
+            "id": "el-logo",
+            "label": "University of Hertfordshire Logo",
+            "type": "image",
+            "box_2d": [
+                50,
+                60,
+                120,
+                430
+            ]
+        },
+        {
+            "id": "el-heading",
+            "label": "Sign in",
+            "type": "text",
+            "box_2d": [
+                160,
+                100,
+                200,
+                350
+            ]
+        },
+        {
+            "id": "el-input-email",
+            "label": "Email Input",
+            "type": "input",
+            "box_2d": [
+                280,
+                100,
+                340,
+                900
+            ]
+        },
+        {
+            "id": "el-link-cant-access",
+            "label": "Can't access your account?",
+            "type": "link",
+            "box_2d": [
+                360,
+                100,
+                400,
+                600
+            ]
+        },
+        {
+            "id": "el-btn-next",
+            "label": "Next Button",
+            "type": "button",
+            "box_2d": [
+                450,
+                675,
+                510,
+                890
+            ]
+        },
+        {
+            "id": "el-info-box",
+            "label": "Login Info Container",
+            "type": "container",
+            "box_2d": [
+                550,
+                100,
+                800,
+                890
+            ]
+        },
+        {
+            "id": "el-btn-options",
+            "label": "Sign-in options",
+            "type": "button",
+            "box_2d": [
+                850,
+                60,
+                920,
+                940
+            ]
+        }
+    ],
+    "probe": {
+        "target": "Next Button",
+        "action": "click",
+        "x": 313,
+        "y": 307
+    }
+}

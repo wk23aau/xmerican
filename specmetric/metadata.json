@@ -1,0 +1,5 @@
+{
+  "name": "SpecMetric AI",
+  "description": "AI-powered UI inspector that detects elements and calculates distances between them.",
+  "requestFramePermissions": []
+}
