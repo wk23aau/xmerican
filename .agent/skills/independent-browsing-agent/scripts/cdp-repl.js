@@ -324,6 +324,146 @@ async function getViewport() {
     console.log(`📐 Viewport: ${vp.width}×${vp.height}`);
 }
 
+/**
+ * Get World State - Scans page for interactive elements (Action Map)
+ * Based on world.md concepts: geometry-first, semantics-second
+ */
+async function getWorldState() {
+    await autoConnect();
+
+    // JavaScript to inject into the page to scan for interactive elements
+    const scanScript = `
+        (function() {
+            const viewport = { width: window.innerWidth, height: window.innerHeight };
+            const elements = [];
+            let idCounter = 0;
+            
+            // Interactive element selectors
+            const selectors = [
+                'button',
+                'a[href]',
+                'input',
+                'select',
+                'textarea',
+                '[role="button"]',
+                '[role="link"]',
+                '[role="menuitem"]',
+                '[role="tab"]',
+                '[role="checkbox"]',
+                '[role="radio"]',
+                '[onclick]',
+                '[tabindex]:not([tabindex="-1"])',
+                'label[for]'
+            ];
+            
+            const candidates = document.querySelectorAll(selectors.join(','));
+            
+            candidates.forEach((el) => {
+                const rect = el.getBoundingClientRect();
+                
+                // Skip invisible or off-screen elements
+                if (rect.width === 0 || rect.height === 0) return;
+                if (rect.bottom < 0 || rect.top > viewport.height) return;
+                if (rect.right < 0 || rect.left > viewport.width) return;
+                
+                // Check visibility
+                const style = window.getComputedStyle(el);
+                if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return;
+                
+                // Get label (try multiple sources)
+                const label = 
+                    el.getAttribute('aria-label') ||
+                    el.getAttribute('title') ||
+                    el.getAttribute('placeholder') ||
+                    el.innerText?.trim().substring(0, 50) ||
+                    el.getAttribute('name') ||
+                    el.getAttribute('id') ||
+                    '';
+                
+                // Get role
+                const role = 
+                    el.getAttribute('role') ||
+                    el.tagName.toLowerCase();
+                
+                // Get element type
+                const type = el.getAttribute('type') || role;
+                
+                // Calculate center point (for clicking)
+                const centerX = Math.round(rect.left + rect.width / 2);
+                const centerY = Math.round(rect.top + rect.height / 2);
+                
+                // Check occlusion (is something blocking this element?)
+                const elAtCenter = document.elementFromPoint(centerX, centerY);
+                const isOccluded = elAtCenter && !el.contains(elAtCenter) && !elAtCenter.contains(el) && elAtCenter !== el;
+                
+                // Get state
+                const state = {
+                    disabled: el.disabled || el.getAttribute('aria-disabled') === 'true',
+                    checked: el.checked || el.getAttribute('aria-checked') === 'true',
+                    expanded: el.getAttribute('aria-expanded') === 'true',
+                    selected: el.getAttribute('aria-selected') === 'true'
+                };
+                
+                // Generate stable ID
+                const id = 'el_' + idCounter++;
+                
+                elements.push({
+                    id,
+                    label: label.substring(0, 60),
+                    role,
+                    type,
+                    rect: {
+                        x: Math.round(rect.left),
+                        y: Math.round(rect.top),
+                        width: Math.round(rect.width),
+                        height: Math.round(rect.height)
+                    },
+                    center: { x: centerX, y: centerY },
+                    state,
+                    occluded: isOccluded,
+                    tag: el.tagName.toLowerCase()
+                });
+            });
+            
+            return JSON.stringify({
+                timestamp: new Date().toISOString(),
+                viewport,
+                cursor: { x: 0, y: 0 },
+                elementCount: elements.length,
+                elements
+            }, null, 2);
+        })()
+    `;
+
+    const result = await sendCommand('Runtime.evaluate', {
+        expression: scanScript,
+        returnByValue: true
+    });
+
+    if (result.result && result.result.value) {
+        const worldState = JSON.parse(result.result.value);
+
+        // Save to output/world.json
+        const outputDir = path.resolve('output');
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+        }
+        const filepath = path.join(outputDir, 'world.json');
+        fs.writeFileSync(filepath, result.result.value);
+
+        console.log(`\n🌍 World State captured:`);
+        console.log(`   Viewport: ${worldState.viewport.width}×${worldState.viewport.height}`);
+        console.log(`   Elements: ${worldState.elementCount} interactive candidates`);
+        console.log(`   Saved to: output/world.json`);
+        console.log(`\n   Top 5 elements:`);
+        worldState.elements.slice(0, 5).forEach((el, i) => {
+            console.log(`   ${i + 1}. [${el.id}] ${el.role}: "${el.label}" @ (${el.center.x}, ${el.center.y})${el.occluded ? ' [OCCLUDED]' : ''}`);
+        });
+    } else if (result.exceptionDetails) {
+        console.log('❌ Error scanning world:', result.exceptionDetails.text);
+    }
+}
+
 function showHelp() {
     console.log(`
 ╔════════════════════════════════════════════════════════════════╗
@@ -346,6 +486,10 @@ function showHelp() {
 ║   type <text>       Type text                                  ║
 ║   press <key>       Press key (Enter, Tab, Escape, etc.)       ║
 ║   scroll <x> <y>    Scroll by pixels                           ║
+╠════════════════════════════════════════════════════════════════╣
+║ PERCEPTION                                                     ║
+║   world             Scan page for interactive elements         ║
+║                     (Action Map → output/world.json)           ║
 ╠════════════════════════════════════════════════════════════════╣
 ║ OTHER                                                          ║
 ║   eval <js>         Execute JavaScript                         ║
@@ -421,6 +565,10 @@ async function processCommand(input) {
             case 'viewport':
             case 'vp':
                 await getViewport();
+                break;
+            case 'world':
+            case 'w':
+                await getWorldState();
                 break;
             case 'help':
             case '?':

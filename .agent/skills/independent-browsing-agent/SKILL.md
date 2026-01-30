@@ -101,12 +101,61 @@ cdp [tab-id]>
 | | `type <text>` | Type text |
 | | `press <key>` | Press key (Enter, Tab, Escape, etc.) |
 | | `scroll <x> <y>` | Scroll page |
+| **Perception** | `world` | Scan page for interactive elements (Action Map) |
 | **Other** | `eval <js>` | Execute JavaScript |
 | | `wait <ms>` | Wait milliseconds |
 | | `help` | Show all commands |
 | | `exit` | Exit REPL |
 
-**Shortcuts:** `ss` = screenshot, `nav` = goto, `vp` = viewport, `q` = exit
+**Shortcuts:** `ss` = screenshot, `nav` = goto, `vp` = viewport, `w` = world, `q` = exit
+
+---
+
+## World State (Action Map)
+
+The `world` command scans the current page for **interactive elements** and outputs a structured **Action Map** to `output/world.json`.
+
+### What it detects
+
+- Buttons, links, inputs, selects, textareas
+- Elements with interactive roles (`button`, `link`, `menuitem`, `tab`, `checkbox`, `radio`)
+- Elements with `onclick` handlers or `tabindex`
+
+### Output format
+
+```json
+{
+  "timestamp": "2026-01-30T23:00:00Z",
+  "viewport": { "width": 400, "height": 640 },
+  "cursor": { "x": 0, "y": 0 },
+  "elementCount": 15,
+  "elements": [
+    {
+      "id": "el_0",
+      "label": "Sign In",
+      "role": "button",
+      "type": "button",
+      "rect": { "x": 100, "y": 200, "width": 80, "height": 30 },
+      "center": { "x": 140, "y": 215 },
+      "state": { "disabled": false, "checked": false, "expanded": false, "selected": false },
+      "occluded": false,
+      "tag": "button"
+    }
+  ]
+}
+```
+
+### Key fields
+
+| Field | Description |
+|-------|-------------|
+| `id` | Unique element ID (`el_0`, `el_1`, etc.) |
+| `label` | Human-readable text (aria-label, title, innerText) |
+| `role` | Element role (button, link, input, etc.) |
+| `rect` | Pixel coordinates and size |
+| `center` | Center point for clicking |
+| `state` | Interactive states (disabled, checked, etc.) |
+| `occluded` | True if element is blocked by another element |
 
 ---
 
