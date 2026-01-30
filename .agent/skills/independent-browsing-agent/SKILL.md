@@ -94,7 +94,7 @@ cdp [tab-id]>
 | | `switch <id\|index>` | Switch to tab by ID or index |
 | | `close [id]` | Close tab |
 | **Navigation** | `goto <url>` | Navigate to URL |
-| | `screenshot` | Save to `capture.png` (replaces previous) |
+| | `screenshot` | Save to `.agent/artifacts/capture.png` |
 | | `viewport` | Get viewport size |
 | **Input** | `click <x> <y>` | Click at coordinates |
 | | `hover <x> <y>` | Move mouse |
@@ -161,7 +161,7 @@ The `world` command scans the current page for **interactive elements** and outp
 
 ## Screenshot Notes
 
-- **Always saves to `capture.png`** (replaces previous screenshot)
+- **Always saves to `.agent/artifacts/capture.png`** (replaces previous screenshot)
 - Saved at **1x scale** (no modifications)
 - Original aspect ratio preserved
 - Format: PNG (lossless)
@@ -185,7 +185,7 @@ cdp [ABC123...]> goto google.com
 ✅ Navigating to: https://google.com
 
 cdp [ABC123...]> ss
-✅ Screenshot saved: capture.png (45678 bytes)
+✅ Screenshot saved: .agent/artifacts/capture.png (45678 bytes)
 
 cdp [ABC123...]> click 200 300
 ✅ Clicked: (200, 300)

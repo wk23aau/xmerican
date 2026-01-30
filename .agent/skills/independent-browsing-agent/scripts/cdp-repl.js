@@ -12,7 +12,7 @@
  *   switch <tabId>           - Switch to tab by ID
  *   close [tabId]            - Close tab (current if no ID)
  *   goto <url>               - Navigate current tab to URL
- *   screenshot               - Take screenshot (always saves to capture.png)
+ *   screenshot               - Take screenshot (saves to .agent/artifacts/capture.png)
  *   click <x> <y>            - Click at coordinates
  *   type <text>              - Type text
  *   press <key>              - Press key (Enter, Tab, Escape, etc.)
@@ -225,9 +225,15 @@ async function screenshot() {
     });
 
     const buffer = Buffer.from(result.data, 'base64');
-    const filepath = path.resolve('capture.png');
+
+    // Save to .agent/artifacts directory
+    const artifactsDir = path.resolve('.agent', 'artifacts');
+    if (!fs.existsSync(artifactsDir)) {
+        fs.mkdirSync(artifactsDir, { recursive: true });
+    }
+    const filepath = path.join(artifactsDir, 'capture.png');
     fs.writeFileSync(filepath, buffer);
-    console.log(`✅ Screenshot saved: capture.png (${buffer.length} bytes)`);
+    console.log(`✅ Screenshot saved: .agent/artifacts/capture.png (${buffer.length} bytes)`);
 }
 
 async function click(x, y) {
@@ -477,7 +483,7 @@ function showHelp() {
 ╠════════════════════════════════════════════════════════════════╣
 ║ NAVIGATION                                                     ║
 ║   goto <url>        Navigate to URL                            ║
-║   screenshot        Save to capture.png (replaces previous)    ║
+║   screenshot        Save to .agent/artifacts/capture.png       ║
 ║   viewport          Show viewport dimensions                   ║
 ╠════════════════════════════════════════════════════════════════╣
 ║ INPUT                                                          ║

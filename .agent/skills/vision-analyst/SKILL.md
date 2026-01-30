@@ -42,7 +42,7 @@ As a multimodal AI with frontend expertise, you can:
 
 | File | Description |
 |------|-------------|
-| `capture.png` | Screenshot from CDP REPL (400×640 viewport, 1x scale) |
+| `.agent/artifacts/capture.png` | Screenshot from CDP REPL (400×640 viewport, 1x scale) |
 
 ---
 
@@ -161,7 +161,7 @@ When analyzing a screenshot, find ALL of these:
 ## Integration Workflow
 
 ```
-1. CDP REPL: ss           → capture.png created
+1. CDP REPL: ss           → .agent/artifacts/capture.png created
 2. You: VIEW capture.png  → analyze pixel by pixel
 3. You: WRITE analysis    → output/analysis.json
 4. Agent: read probe      → execute click/type action
