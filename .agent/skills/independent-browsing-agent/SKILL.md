@@ -94,7 +94,7 @@ cdp [tab-id]>
 | | `switch <id\|index>` | Switch to tab by ID or index |
 | | `close [id]` | Close tab |
 | **Navigation** | `goto <url>` | Navigate to URL |
-| | `screenshot <file>` | Capture screen (1x PNG) |
+| | `screenshot` | Save to `capture.png` (replaces previous) |
 | | `viewport` | Get viewport size |
 | **Input** | `click <x> <y>` | Click at coordinates |
 | | `hover <x> <y>` | Move mouse |
@@ -112,6 +112,7 @@ cdp [tab-id]>
 
 ## Screenshot Notes
 
+- **Always saves to `capture.png`** (replaces previous screenshot)
 - Saved at **1x scale** (no modifications)
 - Original aspect ratio preserved
 - Format: PNG (lossless)
@@ -134,7 +135,7 @@ cdp [no tab]> switch 0
 cdp [ABC123...]> goto google.com
 ✅ Navigating to: https://google.com
 
-cdp [ABC123...]> screenshot capture.png
+cdp [ABC123...]> ss
 ✅ Screenshot saved: capture.png (45678 bytes)
 
 cdp [ABC123...]> click 200 300
@@ -157,7 +158,7 @@ cdp [ABC123...]> exit
 You can also run single commands non-interactively:
 ```powershell
 node scripts/cdp-repl.js goto google.com
-node scripts/cdp-repl.js screenshot capture.png
+node scripts/cdp-repl.js ss
 ```
 
 ---

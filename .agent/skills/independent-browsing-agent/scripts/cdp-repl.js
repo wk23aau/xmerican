@@ -12,7 +12,7 @@
  *   switch <tabId>           - Switch to tab by ID
  *   close [tabId]            - Close tab (current if no ID)
  *   goto <url>               - Navigate current tab to URL
- *   screenshot <filename>    - Take screenshot (saves as PNG, 1x scale)
+ *   screenshot               - Take screenshot (always saves to capture.png)
  *   click <x> <y>            - Click at coordinates
  *   type <text>              - Type text
  *   press <key>              - Press key (Enter, Tab, Escape, etc.)
@@ -214,7 +214,7 @@ async function navigate(url) {
     console.log(`✅ Navigating to: ${url}`);
 }
 
-async function screenshot(filename) {
+async function screenshot() {
     await autoConnect();
 
     const result = await sendCommand('Page.captureScreenshot', {
@@ -225,9 +225,9 @@ async function screenshot(filename) {
     });
 
     const buffer = Buffer.from(result.data, 'base64');
-    const filepath = path.resolve(filename);
+    const filepath = path.resolve('capture.png');
     fs.writeFileSync(filepath, buffer);
-    console.log(`✅ Screenshot saved: ${filepath} (${buffer.length} bytes)`);
+    console.log(`✅ Screenshot saved: capture.png (${buffer.length} bytes)`);
 }
 
 async function click(x, y) {
@@ -337,7 +337,7 @@ function showHelp() {
 ╠════════════════════════════════════════════════════════════════╣
 ║ NAVIGATION                                                     ║
 ║   goto <url>        Navigate to URL                            ║
-║   screenshot <file> Save screenshot (1x PNG)                   ║
+║   screenshot        Save to capture.png (replaces previous)    ║
 ║   viewport          Show viewport dimensions                   ║
 ╠════════════════════════════════════════════════════════════════╣
 ║ INPUT                                                          ║
@@ -388,7 +388,7 @@ async function processCommand(input) {
                 break;
             case 'screenshot':
             case 'ss':
-                await screenshot(args[0] || 'screenshot.png');
+                await screenshot();
                 break;
             case 'click':
                 if (!args[0] || !args[1]) throw new Error('X and Y required');
