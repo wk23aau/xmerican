@@ -1,0 +1,27 @@
+{
+    "version": "1.0",
+    "timestamp": "2026-01-30T23:54:00Z",
+    "imageDimensions": {
+        "width": 500,
+        "height": 56
+    },
+    "elements": [
+        {
+            "id": "settings_panel",
+            "label": "Run Settings",
+            "type": "button",
+            "box_2d": [
+                0,
+                800,
+                0,
+                900
+            ]
+        }
+    ],
+    "probe": {
+        "target": "Run Settings",
+        "action": "click",
+        "x": 449,
+        "y": -14
+    }
+}
