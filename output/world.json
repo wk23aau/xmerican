@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-30T23:48:31.692Z",
+  "timestamp": "2026-01-31T00:05:55.576Z",
   "viewport": {
     "width": 500,
     "height": 547
@@ -8,22 +8,22 @@
     "x": 0,
     "y": 0
   },
-  "elementCount": 35,
+  "elementCount": 4,
   "elements": [
     {
       "id": "el_0",
-      "label": "Dismiss",
+      "label": "Choose files",
       "role": "button",
       "type": "button",
       "rect": {
-        "x": 381,
-        "y": 49,
-        "width": 32,
-        "height": 32
+        "x": 163,
+        "y": -10,
+        "width": 160,
+        "height": 50
       },
       "center": {
-        "x": 397,
-        "y": 65
+        "x": 243,
+        "y": 15
       },
       "state": {
         "disabled": false,
@@ -36,18 +36,18 @@
     },
     {
       "id": "el_1",
-      "label": "View related products",
-      "role": "button",
-      "type": "button",
+      "label": "Answers[0].Body",
+      "role": "input",
+      "type": "text",
       "rect": {
-        "x": 11,
-        "y": 24,
-        "width": 32,
-        "height": 32
+        "x": 30,
+        "y": 227,
+        "width": 425,
+        "height": 50
       },
       "center": {
-        "x": 27,
-        "y": 40
+        "x": 243,
+        "y": 252
       },
       "state": {
         "disabled": false,
@@ -55,23 +55,23 @@
         "expanded": false,
         "selected": false
       },
-      "occluded": true,
-      "tag": "button"
+      "occluded": false,
+      "tag": "input"
     },
     {
       "id": "el_2",
-      "label": "home\nHome",
-      "role": "a",
-      "type": "a",
+      "label": "Answers[1].Body",
+      "role": "input",
+      "type": "text",
       "rect": {
-        "x": -1,
-        "y": 84,
-        "width": 26,
-        "height": 32
+        "x": 30,
+        "y": 364,
+        "width": 425,
+        "height": 50
       },
       "center": {
-        "x": 12,
-        "y": 100
+        "x": 243,
+        "y": 389
       },
       "state": {
         "disabled": false,
@@ -79,551 +79,23 @@
         "expanded": false,
         "selected": false
       },
-      "occluded": true,
-      "tag": "a"
+      "occluded": false,
+      "tag": "input"
     },
     {
       "id": "el_3",
-      "label": "chat_spark\nPlayground",
-      "role": "a",
-      "type": "a",
+      "label": "Answers[2].Body",
+      "role": "input",
+      "type": "text",
       "rect": {
-        "x": -1,
-        "y": 120,
-        "width": 26,
-        "height": 32
+        "x": 30,
+        "y": 501,
+        "width": 425,
+        "height": 50
       },
       "center": {
-        "x": 12,
-        "y": 136
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "a"
-    },
-    {
-      "id": "el_4",
-      "label": "expandCollapseIconTooltipText()",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 29,
-        "y": 120,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 45,
-        "y": 136
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_5",
-      "label": "More options",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 0,
-        "y": 154,
-        "width": 28,
-        "height": 28
-      },
-      "center": {
-        "x": 14,
-        "y": 168
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_6",
-      "label": "More options",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 0,
-        "y": 184,
-        "width": 28,
-        "height": 28
-      },
-      "center": {
-        "x": 14,
-        "y": 198
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_7",
-      "label": "More options",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 0,
-        "y": 214,
-        "width": 28,
-        "height": 28
-      },
-      "center": {
-        "x": 14,
-        "y": 228
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_8",
-      "label": "More options",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 0,
-        "y": 244,
-        "width": 28,
-        "height": 28
-      },
-      "center": {
-        "x": 14,
-        "y": 258
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_9",
-      "label": "More options",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 0,
-        "y": 274,
-        "width": 28,
-        "height": 28
-      },
-      "center": {
-        "x": 14,
-        "y": 288
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_10",
-      "label": "View all history\ntrending_flat",
-      "role": "a",
-      "type": "a",
-      "rect": {
-        "x": -1,
-        "y": 304,
-        "width": 26,
-        "height": 32
-      },
-      "center": {
-        "x": 12,
-        "y": 320
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "a"
-    },
-    {
-      "id": "el_11",
-      "label": "design_services\nBuild\nchevron_right",
-      "role": "a",
-      "type": "a",
-      "rect": {
-        "x": -1,
-        "y": 356,
-        "width": 26,
-        "height": 32
-      },
-      "center": {
-        "x": 12,
-        "y": 372
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "a"
-    },
-    {
-      "id": "el_12",
-      "label": "speed\nDashboard\nchevron_right",
-      "role": "a",
-      "type": "a",
-      "rect": {
-        "x": -1,
-        "y": 392,
-        "width": 26,
-        "height": 32
-      },
-      "center": {
-        "x": 12,
-        "y": 408
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "a"
-    },
-    {
-      "id": "el_13",
-      "label": "developer_guide\nDocumentation\narrow_outward",
-      "role": "a",
-      "type": "a",
-      "rect": {
-        "x": -1,
-        "y": 428,
-        "width": 26,
-        "height": 32
-      },
-      "center": {
-        "x": 12,
-        "y": 444
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "a"
-    },
-    {
-      "id": "el_14",
-      "label": "Disclaimer",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 3,
-        "y": 464,
-        "width": 36,
-        "height": 36
-      },
-      "center": {
-        "x": 21,
-        "y": 482
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_15",
-      "label": "ac_unit\nLet it snow",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": -1,
-        "y": 504,
-        "width": 26,
-        "height": 32
-      },
-      "center": {
-        "x": 12,
-        "y": 520
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_16",
-      "label": "key\nGet API key",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": -1,
-        "y": 536,
-        "width": 26,
-        "height": 32
-      },
-      "center": {
-        "x": 12,
-        "y": 552
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": null,
-      "tag": "button"
-    },
-    {
-      "id": "el_17",
-      "label": "Toggle navigation menu",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 20,
-        "y": 22,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 36,
-        "y": 38
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_18",
-      "label": "12 tokens",
-      "role": "span",
-      "type": "span",
-      "rect": {
-        "x": 60,
-        "y": 40,
-        "width": 69,
-        "height": 20
-      },
-      "center": {
-        "x": 95,
-        "y": 50
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "span"
-    },
-    {
-      "id": "el_19",
-      "label": "New chat",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 376,
-        "y": 22,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 392,
-        "y": 38
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_20",
-      "label": "View more actions",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 412,
-        "y": 22,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 428,
-        "y": 38
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_21",
-      "label": "Toggle run settings panel",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 448,
-        "y": 22,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 464,
-        "y": 38
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_22",
-      "label": "Edit",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 351,
-        "y": 93,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 367,
-        "y": 109
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_23",
-      "label": "Rerun this turn",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 391,
-        "y": 93,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 407,
-        "y": 109
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_24",
-      "label": "Open options",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 431,
-        "y": 95,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 447,
-        "y": 111
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": true,
-      "tag": "button"
-    },
-    {
-      "id": "el_25",
-      "label": "Edit",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 351,
-        "y": 192,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 367,
-        "y": 208
+        "x": 243,
+        "y": 526
       },
       "state": {
         "disabled": false,
@@ -632,223 +104,7 @@
         "selected": false
       },
       "occluded": false,
-      "tag": "button"
-    },
-    {
-      "id": "el_26",
-      "label": "Rerun this turn",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 391,
-        "y": 192,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 407,
-        "y": 208
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "button"
-    },
-    {
-      "id": "el_27",
-      "label": "Open options",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 431,
-        "y": 194,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 447,
-        "y": 210
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "button"
-    },
-    {
-      "id": "el_28",
-      "label": "Good response",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 41,
-        "y": 296,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 57,
-        "y": 312
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "button"
-    },
-    {
-      "id": "el_29",
-      "label": "Bad response",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 77,
-        "y": 296,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 93,
-        "y": 312
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "button"
-    },
-    {
-      "id": "el_30",
-      "label": "Enter a prompt",
-      "role": "textarea",
-      "type": "textarea",
-      "rect": {
-        "x": 25,
-        "y": 442,
-        "width": 450,
-        "height": 32
-      },
-      "center": {
-        "x": 250,
-        "y": 458
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "textarea"
-    },
-    {
-      "id": "el_31",
-      "label": "No API key selected",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 25,
-        "y": 488,
-        "width": 36,
-        "height": 32
-      },
-      "center": {
-        "x": 43,
-        "y": 504
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "button"
-    },
-    {
-      "id": "el_32",
-      "label": "Open tools menu",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 73,
-        "y": 488,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 89,
-        "y": 504
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "button"
-    },
-    {
-      "id": "el_33",
-      "label": "Insert images, videos, audio, or files",
-      "role": "button",
-      "type": "button",
-      "rect": {
-        "x": 330,
-        "y": 488,
-        "width": 32,
-        "height": 32
-      },
-      "center": {
-        "x": 346,
-        "y": 504
-      },
-      "state": {
-        "disabled": false,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "button"
-    },
-    {
-      "id": "el_34",
-      "label": "Run\nCtrl\nkeyboard_return",
-      "role": "button",
-      "type": "submit",
-      "rect": {
-        "x": 374,
-        "y": 488,
-        "width": 101,
-        "height": 32
-      },
-      "center": {
-        "x": 424,
-        "y": 504
-      },
-      "state": {
-        "disabled": true,
-        "checked": false,
-        "expanded": false,
-        "selected": false
-      },
-      "occluded": false,
-      "tag": "button"
+      "tag": "input"
     }
   ]
 }

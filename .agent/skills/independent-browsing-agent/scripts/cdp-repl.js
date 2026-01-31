@@ -143,7 +143,17 @@ function sendCommand(method, params = {}) {
 }
 
 /**
- * Auto-connect to first available tab
+ * Viewport configuration (fixed for consistent automation)
+ */
+const VIEWPORT = {
+    width: 400,
+    height: 640,
+    deviceScaleFactor: 1,
+    mobile: false
+};
+
+/**
+ * Auto-connect to first available tab and enforce viewport
  */
 async function autoConnect() {
     if (ws && ws.readyState === WebSocket.OPEN) return true;
@@ -153,7 +163,17 @@ async function autoConnect() {
         await connectToTab(tabs[0].id);
         await sendCommand('Page.enable');
         await sendCommand('Runtime.enable');
-        await sendCommand('Input.enable');
+        await sendCommand('DOM.enable');
+
+        // Enforce fixed viewport for consistent automation
+        await sendCommand('Emulation.setDeviceMetricsOverride', {
+            width: VIEWPORT.width,
+            height: VIEWPORT.height,
+            deviceScaleFactor: VIEWPORT.deviceScaleFactor,
+            mobile: VIEWPORT.mobile
+        });
+
+        console.log(`📐 Viewport enforced: ${VIEWPORT.width}×${VIEWPORT.height}`);
         return true;
     }
     return false;
@@ -203,7 +223,6 @@ async function switchTab(tabId) {
     await connectToTab(tabId);
     await sendCommand('Page.enable');
     await sendCommand('Runtime.enable');
-    await sendCommand('Input.enable');
     console.log(`✅ Switched to tab: ${tabId}`);
 }
 
@@ -302,6 +321,34 @@ async function scroll(x, y) {
     console.log(`✅ Scrolled: (${x}, ${y})`);
 }
 
+async function upload(selector, filePath) {
+    await autoConnect();
+    // Ensure DOM is enabled
+    await sendCommand('DOM.enable');
+
+    // Get document root
+    const doc = await sendCommand('DOM.getDocument');
+    const rootNodeId = doc.root.nodeId;
+
+    // Find node
+    const node = await sendCommand('DOM.querySelector', {
+        nodeId: rootNodeId,
+        selector: selector
+    });
+
+    if (!node.nodeId) {
+        throw new Error(`Element not found: ${selector}`);
+    }
+
+    // Set files
+    await sendCommand('DOM.setFileInputFiles', {
+        files: [filePath],
+        nodeId: node.nodeId
+    });
+
+    console.log(`✅ Uploaded ${filePath} to ${selector}`);
+}
+
 async function evalJS(expression) {
     await autoConnect();
     const result = await sendCommand('Runtime.evaluate', {
@@ -328,6 +375,27 @@ async function getViewport() {
     });
     const vp = JSON.parse(result.result.value);
     console.log(`📐 Viewport: ${vp.width}×${vp.height}`);
+
+    // Warn if viewport doesn't match expected
+    if (vp.width !== VIEWPORT.width || vp.height !== VIEWPORT.height) {
+        console.log(`⚠️  Expected ${VIEWPORT.width}×${VIEWPORT.height}. Use "reset" to fix.`);
+    }
+}
+
+/**
+ * Reset/re-enforce the viewport to fixed dimensions
+ */
+async function resetViewport() {
+    await autoConnect();
+
+    await sendCommand('Emulation.setDeviceMetricsOverride', {
+        width: VIEWPORT.width,
+        height: VIEWPORT.height,
+        deviceScaleFactor: VIEWPORT.deviceScaleFactor,
+        mobile: VIEWPORT.mobile
+    });
+
+    console.log(`✅ Viewport reset to: ${VIEWPORT.width}×${VIEWPORT.height}`);
 }
 
 /**
@@ -372,6 +440,14 @@ async function getWorldState() {
                 if (rect.bottom < 0 || rect.top > viewport.height) return;
                 if (rect.right < 0 || rect.left > viewport.width) return;
                 
+                // Calculate center point FIRST to validate
+                const centerX = Math.round(rect.left + rect.width / 2);
+                const centerY = Math.round(rect.top + rect.height / 2);
+                
+                // Skip elements whose center is outside the viewport (stricter check)
+                if (centerX < 0 || centerX > viewport.width) return;
+                if (centerY < 0 || centerY > viewport.height) return;
+                
                 // Check visibility
                 const style = window.getComputedStyle(el);
                 if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return;
@@ -393,10 +469,6 @@ async function getWorldState() {
                 
                 // Get element type
                 const type = el.getAttribute('type') || role;
-                
-                // Calculate center point (for clicking)
-                const centerX = Math.round(rect.left + rect.width / 2);
-                const centerY = Math.round(rect.top + rect.height / 2);
                 
                 // Check occlusion (is something blocking this element?)
                 const elAtCenter = document.elementFromPoint(centerX, centerY);
@@ -485,13 +557,16 @@ function showHelp() {
 ║   goto <url>        Navigate to URL                            ║
 ║   screenshot        Save to .agent/artifacts/capture.png       ║
 ║   viewport          Show viewport dimensions                   ║
+║   reset             Re-enforce 400×640 viewport                ║
 ╠════════════════════════════════════════════════════════════════╣
 ║ INPUT                                                          ║
 ║   click <x> <y>     Click at coordinates                       ║
 ║   hover <x> <y>     Move mouse to coordinates                  ║
 ║   type <text>       Type text                                  ║
 ║   press <key>       Press key (Enter, Tab, Escape, etc.)       ║
+║   press <key>       Press key (Enter, Tab, Escape, etc.)       ║
 ║   scroll <x> <y>    Scroll by pixels                           ║
+║   upload <sel> <path> Upload file to input selector            ║
 ╠════════════════════════════════════════════════════════════════╣
 ║ PERCEPTION                                                     ║
 ║   world             Scan page for interactive elements         ║
@@ -560,6 +635,10 @@ async function processCommand(input) {
                 if (!args[0] || !args[1]) throw new Error('X and Y required');
                 await scroll(args[0], args[1]);
                 break;
+            case 'upload':
+                if (!args[0] || !args[1]) throw new Error('Selector and FilePath required');
+                await upload(args[0], args[1]);
+                break;
             case 'eval':
                 if (!args.length) throw new Error('JavaScript required');
                 await evalJS(args.join(' '));
@@ -575,6 +654,9 @@ async function processCommand(input) {
             case 'world':
             case 'w':
                 await getWorldState();
+                break;
+            case 'reset':
+                await resetViewport();
                 break;
             case 'help':
             case '?':

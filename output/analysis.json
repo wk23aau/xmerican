@@ -1,27 +1,38 @@
 {
     "version": "1.0",
-    "timestamp": "2026-01-30T23:54:00Z",
+    "timestamp": "2026-01-31T00:03:00Z",
     "imageDimensions": {
-        "width": 500,
-        "height": 56
+        "width": 400,
+        "height": 640
     },
     "elements": [
         {
-            "id": "settings_panel",
-            "label": "Run Settings",
+            "id": "btn_apply",
+            "label": "Apply for this job",
             "type": "button",
             "box_2d": [
-                0,
-                800,
-                0,
-                900
+                820,
+                100,
+                930,
+                750
+            ]
+        },
+        {
+            "id": "btn_accept_cookies",
+            "label": "Accept all",
+            "type": "button",
+            "box_2d": [
+                950,
+                650,
+                990,
+                850
             ]
         }
     ],
     "probe": {
-        "target": "Run Settings",
+        "target": "Accept all",
         "action": "click",
-        "x": 449,
-        "y": -14
+        "x": 320,
+        "y": 620
     }
 }
