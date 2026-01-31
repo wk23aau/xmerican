@@ -1,38 +1,93 @@
 {
     "version": "1.0",
-    "timestamp": "2026-01-31T00:03:00Z",
+    "timestamp": "2026-01-31T02:05:00Z",
     "imageDimensions": {
         "width": 400,
         "height": 640
     },
     "elements": [
         {
-            "id": "btn_apply",
-            "label": "Apply for this job",
-            "type": "button",
+            "id": "el-1",
+            "label": "My Experience heading",
+            "type": "text",
             "box_2d": [
-                820,
-                100,
-                930,
-                750
+                210,
+                285,
+                260,
+                540
             ]
         },
         {
-            "id": "btn_accept_cookies",
-            "label": "Accept all",
+            "id": "el-2",
+            "label": "Work Experience",
+            "type": "text",
+            "box_2d": [
+                370,
+                40,
+                410,
+                415
+            ]
+        },
+        {
+            "id": "btn_add_work",
+            "label": "Add Work Experience",
             "type": "button",
             "box_2d": [
-                950,
-                650,
-                990,
-                850
+                445,
+                40,
+                505,
+                915
+            ]
+        },
+        {
+            "id": "el-4",
+            "label": "Education",
+            "type": "text",
+            "box_2d": [
+                618,
+                40,
+                658,
+                265
+            ]
+        },
+        {
+            "id": "btn_add_education",
+            "label": "Add Education",
+            "type": "button",
+            "box_2d": [
+                685,
+                40,
+                745,
+                915
+            ]
+        },
+        {
+            "id": "el-6",
+            "label": "Resume/CV",
+            "type": "text",
+            "box_2d": [
+                862,
+                40,
+                900,
+                310
+            ]
+        },
+        {
+            "id": "btn_save_continue",
+            "label": "Save and Continue",
+            "type": "button",
+            "box_2d": [
+                912,
+                530,
+                970,
+                905
             ]
         }
     ],
     "probe": {
-        "target": "Accept all",
+        "target": "Add Work Experience",
         "action": "click",
-        "x": 320,
-        "y": 620
+        "x": 192,
+        "y": 288
     }
 }
