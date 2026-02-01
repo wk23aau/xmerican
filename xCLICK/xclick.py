@@ -30,6 +30,9 @@ from typing import Dict, List, Optional
 from cdp_client import CDPClient
 from config import VIEWPORT_WIDTH, VIEWPORT_HEIGHT, YOLO_MODEL_PATH, USE_OCR_FALLBACK, VISION_MODEL_TYPE
 from motion_controller import MotionController, MotionConfig, MotionState
+from world_state import WorldState, get_world_state, ObjectSource
+from overlay import OverlayRenderer
+from roi_mask import ROIMask, get_roi_mask
 
 
 class xClick:
@@ -43,6 +46,9 @@ class xClick:
         self.vision_enabled = vision
         self.vision_module = None
         self.motion_controller: Optional[MotionController] = None
+        self.world = get_world_state()  # Persistent world state
+        self.overlay: Optional[OverlayRenderer] = None  # Live visual overlay
+        self.roi = get_roi_mask()  # Region of interest filtering
         
     async def connect(self):
         """Connect to browser"""
@@ -60,6 +66,9 @@ class xClick:
         
         # Initialize motion controller for smooth movement
         await self.init_motion_controller()
+        
+        # Initialize overlay renderer for visual debugging
+        self.overlay = OverlayRenderer(self.cdp)
             
     async def init_vision(self):
         """Initialize YOLO vision module"""
@@ -153,6 +162,20 @@ class xClick:
             "returnByValue": True
         })
         self.probes = result.get("result", {}).get("result", {}).get("value", []) or []
+        
+        # Update world state with DOM detections
+        detections = []
+        for p in self.probes:
+            detections.append({
+                "bbox": p.get("bbox", [0, 0, 0, 0]),
+                "label": p.get("text", ""),
+                "confidence": 1.0,  # DOM is high confidence
+                "type": p.get("type", "unknown"),
+                "tag": p.get("tag"),
+                "dom_id": p.get("id")
+            })
+        self.world.update_from_detections(detections, ObjectSource.DOM)
+        
         return self.probes
         
     async def show_probes(self, show_tabs=True):
@@ -414,6 +437,22 @@ class xClick:
 ║   goto <url>     - Navigate               ║
 ║   scroll [amt]   - Scroll down            ║
 ║   tabs / tab <n> - Tab management         ║
+║                                           ║
+║ World State: (persistent tracking)        ║
+║   world          - Show tracked objects   ║
+║   facts          - Export UI facts (JSON) ║
+║                                           ║
+║ Visual Overlay: (debug rendering)         ║
+║   show           - Draw boxes on page     ║
+║   hide           - Clear overlay          ║
+║   overlay        - Toggle overlay         ║
+║                                           ║
+║ ROI Filter: (negative space)              ║
+║   focus [%]      - Focus center, ignore edges ║
+║   noads          - Exclude ads/sidebars   ║
+║   roi            - Show ROI status        ║
+║   clearmask      - Clear all ROI filters  ║
+║                                           ║
 ║   exit / q       - Quit                   ║
 ╚═══════════════════════════════════════════╝
 """)
@@ -531,6 +570,68 @@ class xClick:
                         finally:
                             await self.motion_controller.stop()
                         print(f"✓ smooth click '{args}'")
+                # ===== WORLD STATE COMMANDS =====
+                elif action == "world":
+                    # Show world state summary
+                    print(f"\n─── {self.world.summary()} ───")
+                    for obj in sorted(self.world.objects.values(), key=lambda x: -x.stability_score):
+                        stale = f"stale:{obj.stale_ms:.0f}ms" if obj.stale_ms > 100 else "fresh"
+                        print(f"  [{obj.id:3}] {obj.obj_type:8} '{obj.label[:25]:25}' "
+                              f"({obj.cx:.0f},{obj.cy:.0f}) stab={obj.stability_score:.2f} {stale}")
+                    print("───────────────\n")
+                elif action == "facts":
+                    # Export structured UI facts as JSON
+                    import json
+                    facts = self.world.export_facts()
+                    print(f"\n─── {len(facts)} UI Facts ───")
+                    for fact in facts[:10]:  # Show first 10
+                        print(json.dumps(fact, indent=2))
+                    if len(facts) > 10:
+                        print(f"  ... and {len(facts) - 10} more")
+                    print("───────────────\n")
+                # ===== OVERLAY COMMANDS =====
+                elif action == "show":
+                    # Show overlay with current world objects
+                    if self.overlay:
+                        objects = [obj.to_dict() for obj in self.world.objects.values()]
+                        await self.overlay.update(objects)
+                        print(f"✓ Overlay showing {len(objects)} boxes")
+                elif action == "hide":
+                    # Hide overlay
+                    if self.overlay:
+                        await self.overlay.clear()
+                        print("✓ Overlay hidden")
+                elif action == "overlay":
+                    # Toggle overlay
+                    if self.overlay:
+                        enabled = await self.overlay.toggle()
+                        print(f"✓ Overlay {'enabled' if enabled else 'disabled'}")
+                # ===== ROI MASK COMMANDS =====
+                elif action == "focus":
+                    # Focus on center, ignore edges
+                    margin = int(args) if args else 15
+                    self.roi.viewport_width = VIEWPORT_WIDTH
+                    self.roi.viewport_height = VIEWPORT_HEIGHT
+                    self.roi.focus_center(margin)
+                    print(f"✓ Focused on center ({margin}% margin)")
+                elif action == "roi":
+                    # Show ROI status
+                    print(f"\n─── ROI Filter: {self.roi.get_focus_summary()} ───")
+                    for r in self.roi.include_regions:
+                        print(f"  [INCLUDE] ({r.x1:.0f},{r.y1:.0f})-({r.x2:.0f},{r.y2:.0f}) {r.label}")
+                    for r in self.roi.exclude_regions:
+                        print(f"  [EXCLUDE] ({r.x1:.0f},{r.y1:.0f})-({r.x2:.0f},{r.y2:.0f}) {r.label}")
+                    for r in self.roi.detected_ads:
+                        print(f"  [AD] ({r.x1:.0f},{r.y1:.0f})-({r.x2:.0f},{r.y2:.0f}) {r.label}")
+                    print("───────────────\n")
+                elif action == "clearmask":
+                    # Clear ROI mask
+                    self.roi.clear()
+                    print("✓ ROI mask cleared")
+                elif action == "noads":
+                    # Add standard ad exclusions
+                    self.roi.add_standard_exclusions()
+                    print("✓ Standard exclusions added (edges, sidebar)")
                 else:
                     print(f"Unknown: {action}")
                     
