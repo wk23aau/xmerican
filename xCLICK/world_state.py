@@ -1,12 +1,16 @@
 """
 xCLICK World State Model
 Persistent object tracking across frames with stability scoring
+Now includes Kalman filter for smooth position prediction
 """
 
 import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
+
+# Kalman tracker for smooth predictions
+from tracker import get_tracker, KalmanTracker
 
 
 class ObjectSource(Enum):

@@ -94,7 +94,7 @@ class VisionModule:
                   "radio", "tab", "menu", "icon", "modal", "image", "slider"]
     
     def __init__(self, cdp_client, model_path: str = None, use_ocr: bool = True, 
-                 model_type: str = "ui", inference_hz: float = 5.0):
+                 model_type: str = "ui", inference_hz: float = 15.0):
         """
         Initialize vision module
         
@@ -103,7 +103,7 @@ class VisionModule:
             model_path: Path to YOLO model (optional)
             use_ocr: Whether to use OCR fallback when DOM gives no label
             model_type: 'ui' (pre-trained UI model), 'yolo26n/s/m', or path to .pt
-            inference_hz: YOLO inference rate (1-10 Hz) - boxes are reused between updates
+            inference_hz: YOLO inference rate (10-30 Hz) - boxes are Kalman-smoothed between updates
         """
         self.cdp = cdp_client
         self.model_path = model_path
