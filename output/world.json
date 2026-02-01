@@ -1,0 +1,110 @@
+{
+  "timestamp": "2026-01-31T00:05:55.576Z",
+  "viewport": {
+    "width": 500,
+    "height": 547
+  },
+  "cursor": {
+    "x": 0,
+    "y": 0
+  },
+  "elementCount": 4,
+  "elements": [
+    {
+      "id": "el_0",
+      "label": "Choose files",
+      "role": "button",
+      "type": "button",
+      "rect": {
+        "x": 163,
+        "y": -10,
+        "width": 160,
+        "height": 50
+      },
+      "center": {
+        "x": 243,
+        "y": 15
+      },
+      "state": {
+        "disabled": false,
+        "checked": false,
+        "expanded": false,
+        "selected": false
+      },
+      "occluded": false,
+      "tag": "button"
+    },
+    {
+      "id": "el_1",
+      "label": "Answers[0].Body",
+      "role": "input",
+      "type": "text",
+      "rect": {
+        "x": 30,
+        "y": 227,
+        "width": 425,
+        "height": 50
+      },
+      "center": {
+        "x": 243,
+        "y": 252
+      },
+      "state": {
+        "disabled": false,
+        "checked": false,
+        "expanded": false,
+        "selected": false
+      },
+      "occluded": false,
+      "tag": "input"
+    },
+    {
+      "id": "el_2",
+      "label": "Answers[1].Body",
+      "role": "input",
+      "type": "text",
+      "rect": {
+        "x": 30,
+        "y": 364,
+        "width": 425,
+        "height": 50
+      },
+      "center": {
+        "x": 243,
+        "y": 389
+      },
+      "state": {
+        "disabled": false,
+        "checked": false,
+        "expanded": false,
+        "selected": false
+      },
+      "occluded": false,
+      "tag": "input"
+    },
+    {
+      "id": "el_3",
+      "label": "Answers[2].Body",
+      "role": "input",
+      "type": "text",
+      "rect": {
+        "x": 30,
+        "y": 501,
+        "width": 425,
+        "height": 50
+      },
+      "center": {
+        "x": 243,
+        "y": 526
+      },
+      "state": {
+        "disabled": false,
+        "checked": false,
+        "expanded": false,
+        "selected": false
+      },
+      "occluded": false,
+      "tag": "input"
+    }
+  ]
+}

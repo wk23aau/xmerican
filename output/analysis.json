@@ -1,0 +1,93 @@
+{
+    "version": "1.0",
+    "timestamp": "2026-01-31T02:05:00Z",
+    "imageDimensions": {
+        "width": 400,
+        "height": 640
+    },
+    "elements": [
+        {
+            "id": "el-1",
+            "label": "My Experience heading",
+            "type": "text",
+            "box_2d": [
+                210,
+                285,
+                260,
+                540
+            ]
+        },
+        {
+            "id": "el-2",
+            "label": "Work Experience",
+            "type": "text",
+            "box_2d": [
+                370,
+                40,
+                410,
+                415
+            ]
+        },
+        {
+            "id": "btn_add_work",
+            "label": "Add Work Experience",
+            "type": "button",
+            "box_2d": [
+                445,
+                40,
+                505,
+                915
+            ]
+        },
+        {
+            "id": "el-4",
+            "label": "Education",
+            "type": "text",
+            "box_2d": [
+                618,
+                40,
+                658,
+                265
+            ]
+        },
+        {
+            "id": "btn_add_education",
+            "label": "Add Education",
+            "type": "button",
+            "box_2d": [
+                685,
+                40,
+                745,
+                915
+            ]
+        },
+        {
+            "id": "el-6",
+            "label": "Resume/CV",
+            "type": "text",
+            "box_2d": [
+                862,
+                40,
+                900,
+                310
+            ]
+        },
+        {
+            "id": "btn_save_continue",
+            "label": "Save and Continue",
+            "type": "button",
+            "box_2d": [
+                912,
+                530,
+                970,
+                905
+            ]
+        }
+    ],
+    "probe": {
+        "target": "Add Work Experience",
+        "action": "click",
+        "x": 192,
+        "y": 288
+    }
+}

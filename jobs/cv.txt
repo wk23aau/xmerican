@@ -1,0 +1,44 @@
+WASEEM RAZA KHAN
+QA Engineer – AI/LLM Specialist
+London, SW17 0DN | UK | +447404132345 | waseemrazakhansqa@gmail.com
+PROFESSIONAL SUMMARY
+QA Engineer with specialized expertise in AI/LLM testing and data validation. Experienced in Python, TypeScript, and Playwright
+automation with strong Docker, Kubernetes, and CI/CD pipeline knowledge. Currently completing MSc Data Science focusing on NLP
+and transformer models. Passionate about ensuring AI product quality through comprehensive testing covering UI, API, performance,
+and LLM-specific validation.
+TECHNICAL SKILLS
+AI/LLM Testing: LLM Testing, Model Evaluation, NLP Validation, Data
+Integrity Testing, AI Output Verification
+Test Automation: Playwright, Python/PyTest, TypeScript, API
+Testing, UI Testing
+DevOps & Infrastructure: Docker, Kubernetes, GitHub Actions,
+CI/CD Pipelines, Linux
+Languages & Tools: Python (Advanced), TypeScript, SQL, Git,
+Postman, Jira
+PROFESSIONAL EXPERIENCE
+Archopinion London, UK
+AI Quality Engineer / LLM Testing Specialist Jan 2024 – Present
+Developed testing strategies for NLP and Computer Vision models, validating AI outputs for accuracy.
+Built Python pipelines to test large datasets, detecting data quality issues affecting model performance.
+Implemented automated UI tests using Playwright for AI-driven document analysis platform.
+Integrated quality gates into GitHub Actions ensuring continuous testing of AI systems.
+Al Yamama Company | NEOM (The LINE) Saudi Arabia
+Senior QA Engineer Jan 2023 – Jan 2024
+Built comprehensive REST API test suites validating data across distributed systems.
+Conducted performance and scalability testing for high-concurrency enterprise systems.
+Managed containerized testing environments using Docker and Kubernetes concepts.
+Amigo Software Lahore, Pakistan
+QA Automation Engineer Oct 2020 – Dec 2023
+Developed comprehensive automated test suites reducing manual testing by 60%.
+Established quality systems across multiple product requirements with continuous improvement.
+Eyecix Solutions Lahore, Pakistan
+Frontend Developer / QA July 2019 – Oct 2020
+Conducted thorough UI testing and gained TypeScript development experience.
+EDUCATION
+MSc Data Science & Analytics 2024 – Dec 2025
+University of Hertfordshire | UK
+GPA: 3.57 | Focus: NLP, Transformer Models, LLM Evaluation
+BSc Computer Science 2015 – 2019
+The Islamia University of Bahawalpur | Pakistan
+GPA: 3.3/4.0 | Software Engineering, AI Fundamentals
+Available Immediately | Full Right to Work in UK
