@@ -195,16 +195,38 @@ class ProbeOCR:
         probes: List[Dict],
         max_probes: int = 15
     ) -> Dict[int, str]:
-        """Extract text for multiple probes"""
-        result = {}
+        """
+        Extract text for interactive probes only
+        Skips: icon, logo, image - these don't have useful text
+        """
+        # Only OCR these interactive element types
+        OCR_TYPES = {"button", "link", "input", "checkbox", "dropdown", "menu", "text"}
+        SKIP_TYPES = {"icon", "logo", "image", "close"}
         
-        for probe in probes[:max_probes]:
+        result = {}
+        ocr_count = 0
+        
+        for probe in probes:
+            if ocr_count >= max_probes:
+                break
+                
+            probe_type = probe.get("type", "").lower()
+            
+            # Skip non-interactive elements
+            if probe_type in SKIP_TYPES:
+                continue
+                
+            # Only OCR interactive elements
+            if probe_type not in OCR_TYPES:
+                continue
+                
             probe_id = probe.get("id")
             bbox = probe.get("bbox", [0, 0, 0, 0])
             
             text = self.extract_text(frame, bbox)
             if text:
                 result[probe_id] = text
+                ocr_count += 1
                 
         return result
         
