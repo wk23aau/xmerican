@@ -1,0 +1,223 @@
+"""
+CDP WebSocket Client for browser control
+Handles connection, screencast, and input dispatch
+"""
+
+import asyncio
+import json
+import base64
+import websockets
+from typing import Optional, Callable, Dict, Any
+from config import CDP_HOST, CDP_PORT, VIEWPORT_WIDTH, VIEWPORT_HEIGHT
+
+
+class CDPClient:
+    def __init__(self, host: str = CDP_HOST, port: int = CDP_PORT):
+        self.host = host
+        self.port = port
+        self.ws: Optional[websockets.WebSocketClientProtocol] = None
+        self.message_id = 0
+        self.pending_responses: Dict[int, asyncio.Future] = {}
+        self.frame_callback: Optional[Callable] = None
+        self._listen_task: Optional[asyncio.Task] = None
+        
+    async def connect(self, target_url: Optional[str] = None):
+        """Connect to Chrome DevTools Protocol"""
+        # Get available targets
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://{self.host}:{self.port}/json") as resp:
+                targets = await resp.json()
+        
+        # Find page target
+        page_target = None
+        for target in targets:
+            if target.get("type") == "page":
+                if target_url is None or target_url in target.get("url", ""):
+                    page_target = target
+                    break
+        
+        if not page_target:
+            raise Exception("No suitable page target found")
+        
+        ws_url = page_target["webSocketDebuggerUrl"]
+        self.ws = await websockets.connect(ws_url)
+        self._listen_task = asyncio.create_task(self._listen())
+        print(f"Connected to {page_target['url']}")
+        
+    async def _listen(self):
+        """Listen for CDP messages"""
+        try:
+            async for message in self.ws:
+                data = json.loads(message)
+                
+                # Handle response to our commands
+                if "id" in data:
+                    msg_id = data["id"]
+                    if msg_id in self.pending_responses:
+                        self.pending_responses[msg_id].set_result(data)
+                
+                # Handle events
+                if "method" in data:
+                    await self._handle_event(data)
+                    
+        except websockets.exceptions.ConnectionClosed:
+            print("CDP connection closed")
+            
+    async def _handle_event(self, event: Dict[str, Any]):
+        """Handle CDP events"""
+        method = event["method"]
+        params = event.get("params", {})
+        
+        if method == "Page.screencastFrame":
+            # Decode frame and pass to callback
+            if self.frame_callback:
+                frame_data = base64.b64decode(params["data"])
+                await self.frame_callback(frame_data, params["metadata"])
+            
+            # Acknowledge frame
+            await self.send("Page.screencastFrameAck", {
+                "sessionId": params["sessionId"]
+            })
+            
+    async def send(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Send CDP command and wait for response"""
+        self.message_id += 1
+        msg_id = self.message_id
+        
+        message = {
+            "id": msg_id,
+            "method": method,
+            "params": params or {}
+        }
+        
+        future = asyncio.get_event_loop().create_future()
+        self.pending_responses[msg_id] = future
+        
+        await self.ws.send(json.dumps(message))
+        
+        try:
+            result = await asyncio.wait_for(future, timeout=10.0)
+            return result
+        finally:
+            del self.pending_responses[msg_id]
+            
+    async def send_no_wait(self, method: str, params: Dict[str, Any] = None):
+        """Send CDP command without waiting for response (for input events)"""
+        self.message_id += 1
+        msg_id = self.message_id
+        
+        message = {
+            "id": msg_id,
+            "method": method,
+            "params": params or {}
+        }
+        
+        await self.ws.send(json.dumps(message))
+            
+    async def start_screencast(self, callback: Callable, quality: int = 80):
+        """Start receiving screen frames"""
+        self.frame_callback = callback
+        await self.send("Page.startScreencast", {
+            "format": "jpeg",
+            "quality": quality,
+            "maxWidth": VIEWPORT_WIDTH,
+            "maxHeight": VIEWPORT_HEIGHT
+        })
+        
+    async def stop_screencast(self):
+        """Stop receiving screen frames"""
+        await self.send("Page.stopScreencast")
+        self.frame_callback = None
+        
+    async def mouse_move(self, x: float, y: float):
+        """Move mouse to position (normalized 0-1 coords)"""
+        await self.send_no_wait("Input.dispatchMouseEvent", {
+            "type": "mouseMoved",
+            "x": int(x * VIEWPORT_WIDTH),
+            "y": int(y * VIEWPORT_HEIGHT)
+        })
+        
+    async def mouse_click(self, x: float, y: float, button: str = "left"):
+        """Click at position (normalized 0-1 coords)"""
+        px = int(x * VIEWPORT_WIDTH)
+        py = int(y * VIEWPORT_HEIGHT)
+        
+        # Mouse down
+        await self.send_no_wait("Input.dispatchMouseEvent", {
+            "type": "mousePressed",
+            "x": px,
+            "y": py,
+            "button": button,
+            "clickCount": 1
+        })
+        
+        await asyncio.sleep(0.05)
+        
+        # Mouse up
+        await self.send_no_wait("Input.dispatchMouseEvent", {
+            "type": "mouseReleased",
+            "x": px,
+            "y": py,
+            "button": button,
+            "clickCount": 1
+        })
+        
+    async def scroll(self, x: float, y: float, delta_y: int):
+        """Scroll at position (normalized 0-1 coords)"""
+        await self.send_no_wait("Input.dispatchMouseEvent", {
+            "type": "mouseWheel",
+            "x": int(x * VIEWPORT_WIDTH),
+            "y": int(y * VIEWPORT_HEIGHT),
+            "deltaX": 0,
+            "deltaY": delta_y
+        })
+        
+    async def type_text(self, text: str):
+        """Type text character by character"""
+        for char in text:
+            await self.send("Input.dispatchKeyEvent", {
+                "type": "char",
+                "text": char
+            })
+            await asyncio.sleep(0.02)
+            
+    async def press_key(self, key: str):
+        """Press a special key (Enter, Tab, Escape, etc.)"""
+        key_codes = {
+            "Enter": 13,
+            "Tab": 9,
+            "Escape": 27,
+            "Backspace": 8,
+            "ArrowDown": 40,
+            "ArrowUp": 38,
+        }
+        
+        await self.send("Input.dispatchKeyEvent", {
+            "type": "keyDown",
+            "key": key,
+            "windowsVirtualKeyCode": key_codes.get(key, 0)
+        })
+        await self.send("Input.dispatchKeyEvent", {
+            "type": "keyUp",
+            "key": key,
+            "windowsVirtualKeyCode": key_codes.get(key, 0)
+        })
+        
+    async def navigate(self, url: str):
+        """Navigate to URL"""
+        await self.send("Page.navigate", {"url": url})
+        
+    async def get_url(self) -> str:
+        """Get current page URL"""
+        result = await self.send("Runtime.evaluate", {
+            "expression": "window.location.href"
+        })
+        return result.get("result", {}).get("result", {}).get("value", "")
+        
+    async def close(self):
+        """Close CDP connection"""
+        if self._listen_task:
+            self._listen_task.cancel()
+        if self.ws:
+            await self.ws.close()
