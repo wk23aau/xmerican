@@ -203,17 +203,31 @@ class VisionModule:
         Returns:
             (png_bytes, device_pixel_ratio, css_width, css_height)
         """
+        from config import VIEWPORT_WIDTH, VIEWPORT_HEIGHT
+        
         # Get viewport metrics
         try:
             metrics = await self.cdp.send("Page.getLayoutMetrics")
             visual = metrics.get("result", {}).get("visualViewport", {})
-            self.viewport_w = int(visual.get("clientWidth", 400))
-            self.viewport_h = int(visual.get("clientHeight", 640))
+            actual_w = int(visual.get("clientWidth", VIEWPORT_WIDTH))
+            actual_h = int(visual.get("clientHeight", VIEWPORT_HEIGHT))
             self.dpr = float(visual.get("scale", 1.0))
-        except:
-            pass  # Use defaults
             
-        # Capture screenshot
+            # Use configured size if browser ignores emulation (non-headless)
+            # This fixes the 2x capture bug when Chrome ignores setDeviceMetricsOverride
+            if actual_w > VIEWPORT_WIDTH * 1.5 or actual_h > VIEWPORT_HEIGHT * 1.5:
+                self.viewport_w = VIEWPORT_WIDTH
+                self.viewport_h = VIEWPORT_HEIGHT
+                print(f"  [vp] browser={actual_w}x{actual_h} → capture={self.viewport_w}x{self.viewport_h}")
+            else:
+                self.viewport_w = actual_w
+                self.viewport_h = actual_h
+                print(f"  [vp] {self.viewport_w}x{self.viewport_h} dpr={self.dpr}")
+        except:
+            self.viewport_w = VIEWPORT_WIDTH
+            self.viewport_h = VIEWPORT_HEIGHT
+            
+        # Capture screenshot at configured size
         result = await self.cdp.send("Page.captureScreenshot", {
             "format": "png",
             "clip": {
@@ -392,16 +406,21 @@ class VisionModule:
         """Convert CSS coordinates to pixel coordinates"""
         return css_x * self.dpr, css_y * self.dpr
         
-    async def detect_labeled_probes(self, confidence: float = 0.25) -> List[LabeledProbe]:
+    async def detect_labeled_probes(self, confidence: float = 0.25, verbose: bool = False) -> List[LabeledProbe]:
         """
         Main detection pipeline: YOLO + DOM fusion
         
         Returns:
             List of LabeledProbe objects with visual boxes and DOM labels
         """
+        import time as _time
+        t_start = _time.perf_counter()
+        
         # Initialize model if needed
         if not self.model:
             await self.init_model()
+        
+        t_init = _time.perf_counter()
             
         # Capture viewport
         png_bytes, dpr, css_w, css_h = await self.capture_viewport()
@@ -409,9 +428,11 @@ class VisionModule:
             return []
             
         self.dpr = dpr
+        t_capture = _time.perf_counter()
         
         # Run YOLO detection
         boxes = self.detect_objects(png_bytes, confidence)
+        t_yolo = _time.perf_counter()
         
         # Fuse with DOM labels
         probes = []
@@ -496,6 +517,23 @@ class VisionModule:
                 dom_id=dom_info.get("id") if dom_info else None,
             )
             probes.append(probe)
+        
+        t_fusion = _time.perf_counter()
+        
+        # Store timing stats
+        self._last_timing = {
+            "capture_ms": (t_capture - t_init) * 1000,
+            "yolo_ms": (t_yolo - t_capture) * 1000,
+            "fusion_ms": (t_fusion - t_yolo) * 1000,
+            "total_ms": (t_fusion - t_start) * 1000,
+            "num_detections": len(probes)
+        }
+        
+        if verbose:
+            print(f"  ⏱ Capture: {self._last_timing['capture_ms']:.0f}ms | "
+                  f"YOLO: {self._last_timing['yolo_ms']:.0f}ms | "
+                  f"Fusion: {self._last_timing['fusion_ms']:.0f}ms | "
+                  f"Total: {self._last_timing['total_ms']:.0f}ms ({len(probes)} elements)")
             
         # Cache for throttled access
         self._cached_probes = probes

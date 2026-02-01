@@ -440,6 +440,7 @@ class xClick:
 ║   vprobes / vp   - Show YOLO elements     ║
 ║   vclick <label> - Click by vision label  ║
 ║   vscan          - Save debug screenshot  ║
+║   timing         - Show latency stats     ║
 ║   vision         - Enable vision mode     ║
 ║                                           ║
 ║ Smooth Motion: (human-like movement)      ║
@@ -533,6 +534,22 @@ class xClick:
                 elif action == "vscan":
                     path = args if args else None
                     await self.save_vision_scan(path)
+                elif action == "timing":
+                    # Show latency timing stats from last vision detection
+                    if self.vision_enabled and self.vision_module:
+                        if hasattr(self.vision_module, '_last_timing') and self.vision_module._last_timing:
+                            t = self.vision_module._last_timing
+                            print(f"\n─── LATENCY STATS ───")
+                            print(f"  Viewport Capture: {t['capture_ms']:6.1f} ms")
+                            print(f"  YOLO Inference:   {t['yolo_ms']:6.1f} ms")
+                            print(f"  DOM Fusion:       {t['fusion_ms']:6.1f} ms")
+                            print(f"  ─────────────────────────")
+                            print(f"  TOTAL:            {t['total_ms']:6.1f} ms  ({t['num_detections']} elements)")
+                            print(f"───────────────\n")
+                        else:
+                            print("✗ No timing data yet. Run 'vp' first.")
+                    else:
+                        print("✗ Vision not enabled. Run with --vision flag")
                 elif action == "vision":
                     if not self.vision_enabled:
                         await self.init_vision()
