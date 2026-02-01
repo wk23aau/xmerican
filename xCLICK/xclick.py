@@ -33,6 +33,7 @@ from motion_controller import MotionController, MotionConfig, MotionState
 from world_state import WorldState, get_world_state, ObjectSource
 from overlay import OverlayRenderer
 from roi_mask import ROIMask, get_roi_mask
+from perception_loop import PerceptionLoop, create_perception_loop
 
 
 class xClick:
@@ -49,6 +50,7 @@ class xClick:
         self.world = get_world_state()  # Persistent world state
         self.overlay: Optional[OverlayRenderer] = None  # Live visual overlay
         self.roi = get_roi_mask()  # Region of interest filtering
+        self.perception_loop: Optional[PerceptionLoop] = None  # Continuous perception
         
     async def connect(self):
         """Connect to browser"""
@@ -645,6 +647,31 @@ class xClick:
                     # Add standard ad exclusions
                     self.roi.add_standard_exclusions()
                     print("✓ Standard exclusions added (edges, sidebar)")
+                # ===== PERCEPTION LOOP COMMANDS (ChatGPT Gap C) =====
+                elif action == "startloop":
+                    # Start continuous perception loop
+                    if self.perception_loop and self.perception_loop.is_running:
+                        print("✓ Perception loop already running")
+                    else:
+                        refresh_vision = self.refresh_vision_probes if self.vision_enabled else None
+                        self.perception_loop = create_perception_loop(
+                            self.refresh_probes, refresh_vision,
+                            dom_hz=10.0, vision_hz=15.0
+                        )
+                        await self.perception_loop.start()
+                elif action == "stoploop":
+                    # Stop perception loop
+                    if self.perception_loop and self.perception_loop.is_running:
+                        await self.perception_loop.stop()
+                        print("✓ Perception loop stopped")
+                    else:
+                        print("✗ Perception loop not running")
+                elif action == "loopstat":
+                    # Show perception loop status
+                    if self.perception_loop:
+                        print(self.perception_loop.status())
+                    else:
+                        print("Perception loop: NOT INITIALIZED")
                 else:
                     print(f"Unknown: {action}")
                     
