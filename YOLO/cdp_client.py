@@ -75,8 +75,8 @@ class CDPClient:
                 frame_data = base64.b64decode(params["data"])
                 await self.frame_callback(frame_data, params["metadata"])
             
-            # Acknowledge frame
-            await self.send("Page.screencastFrameAck", {
+            # Acknowledge frame (fire and forget)
+            await self.send_no_wait("Page.screencastFrameAck", {
                 "sessionId": params["sessionId"]
             })
             

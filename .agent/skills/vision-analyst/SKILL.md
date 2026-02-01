@@ -5,52 +5,56 @@ description: Real-time vision agent using YOLO streaming probes for near-zero la
 
 # Vision Analyst (YOLO Streaming)
 
-You are a **Real-Time Vision Agent** powered by **YOLO streaming probes** that detects UI elements at **30-60 Hz** with near-zero latency.
+**YOLO = PERCEPTION ONLY.** The executor (agent) reads probes and performs actions.
 
 > [!CAUTION]
-> **YOLO STREAMING PROBES - NOT SCREENSHOT-BASED**
+> **YOLO DOES NOT TAKE ACTIONS**
 > 
-> This agent uses continuous frame streaming, NOT static screenshots.
-> - Probes are detected in real-time as the page renders
-> - Coordinates are pre-computed and ready for immediate action
-> - No analysis delay - act on the current frame
+> YOLO only provides:
+> - Probe coordinates (what to click)
+> - Bounding boxes (where elements are)
+> - Blocker detection (what's in the way)
+> 
+> The **executor** reads `output/yolo_probes.json` and acts via CDP REPL.
 
 ---
 
 ## Architecture
 
 ```
-+------------------+     +------------------+     +------------------+
-|  CDP Screencast  | --> |  YOLO Detector   | --> |  World State     |
-|  (30-60 Hz)      |     |  (Probe Stream)  |     |  (Live Probes)   |
-+------------------+     +------------------+     +------------------+
-                                                           |
-                                                           v
-+------------------+     +------------------+     +------------------+
-|  Mouse/Scroll    | <-- |  FSM Planner     | <-- |  Probe Scorer    |
-|  Controller      |     |  (Actions)       |     |  (Ranking)       |
-+------------------+     +------------------+     +------------------+
+┌─────────────────────────────────────────────────────────────────────┐
+│  YOLO PERCEPTION (30-60 Hz) - NO ACTIONS                            │
+│                                                                     │
+│  CDP Screencast → YOLO Detect → Track → output/yolo_probes.json    │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼ (file read)
+┌─────────────────────────────────────────────────────────────────────┐
+│  EXECUTOR (Agent) - PERFORMS ACTIONS                                │
+│                                                                     │
+│  1. Read yolo_probes.json                                           │
+│  2. Read DOM world state (optional)                                 │
+│  3. Decide: which probe to click                                    │
+│  4. Execute: CDP REPL click/type/scroll                             │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## How to Use
 
-### 1. Start YOLO Agent with Debug View
+### 1. Start YOLO Probe Server (perception only)
 ```bash
 cd YOLO
-python main.py --debug
+python probe_server.py --debug
 ```
 
-### 2. Probes Are Auto-Detected
-No need to take screenshots or analyze manually. Probes stream continuously:
-- **Buttons** (green boxes)
-- **Links** (orange boxes)
-- **Inputs** (cyan boxes)
-- **Checkboxes** (yellow boxes)
-- **Icons** (pink boxes)
-
-### 3. World State Updates in Real-Time
+### 2. Probes stream to file in real-time
+```
+output/yolo_probes.json  (updates at 30 Hz)
+```
 ```json
 {
   "timestamp": 1738404000.123,
