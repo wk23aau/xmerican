@@ -12,6 +12,7 @@ Output: "button @ (x,y): Submit" instead of just "button @ (x,y)"
 
 import asyncio
 import base64
+import time
 import numpy as np
 from io import BytesIO
 from PIL import Image
@@ -19,6 +20,9 @@ from typing import List, Dict, Tuple, Optional, Any
 from dataclasses import dataclass, asdict
 import sys
 import os
+
+# Import motion controller utilities
+from motion_controller import fuse_confidence, normalize_coords, denormalize_coords
 
 # Add YOLO directory to path for imports
 YOLO_DIR = os.path.join(os.path.dirname(__file__), "..", "YOLO")
@@ -90,7 +94,7 @@ class VisionModule:
                   "radio", "tab", "menu", "icon", "modal", "image", "slider"]
     
     def __init__(self, cdp_client, model_path: str = None, use_ocr: bool = True, 
-                 model_type: str = "ui"):
+                 model_type: str = "ui", inference_hz: float = 5.0):
         """
         Initialize vision module
         
@@ -99,6 +103,7 @@ class VisionModule:
             model_path: Path to YOLO model (optional)
             use_ocr: Whether to use OCR fallback when DOM gives no label
             model_type: 'ui' (pre-trained UI model), 'yolo26n/s/m', or path to .pt
+            inference_hz: YOLO inference rate (1-10 Hz) - boxes are reused between updates
         """
         self.cdp = cdp_client
         self.model_path = model_path
@@ -110,6 +115,13 @@ class VisionModule:
         self.viewport_w = 400
         self.viewport_h = 640
         self._probe_id_counter = 0
+        
+        # Throttled inference (ChatGPT recommendation)
+        self.inference_hz = inference_hz
+        self._inference_interval = 1.0 / inference_hz
+        self._last_inference_time = 0.0
+        self._cached_boxes: List[Dict] = []
+        self._cached_probes: List[LabeledProbe] = []
         
     async def init_model(self):
         """Initialize YOLO model"""
@@ -470,7 +482,58 @@ class VisionModule:
             )
             probes.append(probe)
             
+        # Cache for throttled access
+        self._cached_probes = probes
         return probes
+    
+    async def detect_throttled(self, confidence: float = 0.25, force: bool = False) -> List[LabeledProbe]:
+        """
+        Throttled detection - runs YOLO at inference_hz rate, reuses cached boxes otherwise.
+        
+        This is the recommended method for real-time loops:
+        - Perception loop calls this at desired rate
+        - YOLO only runs when interval elapsed
+        - Between updates, cached probes are returned
+        
+        Args:
+            confidence: Detection confidence threshold
+            force: Force fresh detection (ignore throttle)
+            
+        Returns:
+            List of LabeledProbe (may be cached)
+        """
+        now = time.monotonic()
+        time_since_last = now - self._last_inference_time
+        
+        # Check if we should run fresh detection
+        if force or time_since_last >= self._inference_interval or not self._cached_probes:
+            self._last_inference_time = now
+            return await self.detect_labeled_probes(confidence)
+        
+        # Return cached probes
+        return self._cached_probes
+    
+    def apply_confidence_fusion(self, probes: List[LabeledProbe]) -> List[LabeledProbe]:
+        """
+        Apply confidence fusion to probes (ChatGPT recommendation).
+        
+        Formula: final_conf = vision_conf * 0.6 + dom_conf * 0.4
+        
+        - Vision confidence from YOLO
+        - DOM confidence: 1.0 if label found, 0.5 otherwise
+        """
+        for probe in probes:
+            vision_conf = probe.confidence
+            dom_conf = 1.0 if probe.label_source == "dom" else 0.5
+            probe.confidence = fuse_confidence(vision_conf, dom_conf)
+        return probes
+    
+    def get_normalized_coords(self, probe: LabeledProbe) -> Tuple[float, float]:
+        """
+        Get normalized coordinates (0-1) for a probe.
+        Useful for avoiding device scale factor issues.
+        """
+        return normalize_coords(probe.cx, probe.cy, self.viewport_w, self.viewport_h)
         
     def find_probe_by_label(self, probes: List[LabeledProbe], query: str) -> Optional[LabeledProbe]:
         """Find a probe by label text (case-insensitive partial match)"""

@@ -29,6 +29,7 @@ import os
 from typing import Dict, List, Optional
 from cdp_client import CDPClient
 from config import VIEWPORT_WIDTH, VIEWPORT_HEIGHT, YOLO_MODEL_PATH, USE_OCR_FALLBACK, VISION_MODEL_TYPE
+from motion_controller import MotionController, MotionConfig, MotionState
 
 
 class xClick:
@@ -41,6 +42,7 @@ class xClick:
         self.debug = debug
         self.vision_enabled = vision
         self.vision_module = None
+        self.motion_controller: Optional[MotionController] = None
         
     async def connect(self):
         """Connect to browser"""
@@ -48,9 +50,16 @@ class xClick:
         await self.cdp.connect(set_viewport=True)
         print("Connected!")
         
+        # Initialize visual cursor (green circle follows mouse)
+        await self.cdp.init_cursor_visual()
+        print("✓ Visual cursor enabled")
+        
         # Initialize vision module if enabled
         if self.vision_enabled:
             await self.init_vision()
+        
+        # Initialize motion controller for smooth movement
+        await self.init_motion_controller()
             
     async def init_vision(self):
         """Initialize YOLO vision module"""
@@ -60,7 +69,8 @@ class xClick:
                 self.cdp,
                 model_path=YOLO_MODEL_PATH,
                 use_ocr=USE_OCR_FALLBACK,
-                model_type=VISION_MODEL_TYPE
+                model_type=VISION_MODEL_TYPE,
+                inference_hz=5.0  # ChatGPT recommendation: 3-6 Hz
             )
             await self.vision_module.init_model()
             self.vision_enabled = True
@@ -71,6 +81,23 @@ class xClick:
         except Exception as e:
             print(f"✗ Vision init failed: {e}")
             self.vision_enabled = False
+    
+    async def init_motion_controller(self):
+        """Initialize motion controller for smooth mouse movement"""
+        async def move_callback(x: float, y: float):
+            """Dispatch mouse move to browser with visual cursor"""
+            await self.cdp.mouse_move(x, y, update_visual=True)
+        
+        async def click_callback(x: float, y: float):
+            """Dispatch mouse click to browser"""
+            await self.click(int(x), int(y))
+        
+        self.motion_controller = MotionController(
+            move_callback=move_callback,
+            click_callback=click_callback,
+            config=MotionConfig()
+        )
+        print("✓ Motion controller initialized")
         
     async def refresh_probes(self) -> List[Dict]:
         """Query DOM for all interactive elements"""
@@ -377,6 +404,10 @@ class xClick:
 ║   vscan          - Save debug screenshot  ║
 ║   vision         - Enable vision mode     ║
 ║                                           ║
+║ Smooth Motion: (human-like movement)      ║
+║   seek <text>    - Smooth move to element ║
+║   smooth <text>  - Smooth move + click    ║
+║                                           ║
 ║ Other:                                    ║
 ║   type <text>    - Type text              ║
 ║   press <key>    - Press key              ║
@@ -453,7 +484,53 @@ class xClick:
                         await self.init_vision()
                     else:
                         print("✓ Vision already enabled")
-                # ===== END VISION COMMANDS =====
+                # ===== SMOOTH MOTION COMMANDS (ChatGPT recommendation) =====
+                elif action == "seek":
+                    # Smoothly move to element without clicking
+                    if self.motion_controller:
+                        await self.motion_controller.start()
+                        try:
+                            # Try to parse as coordinates first
+                            coords = args.split()
+                            try:
+                                if len(coords) == 2:
+                                    x, y = float(coords[0]), float(coords[1])
+                                    await self.motion_controller.seek_only(x, y)
+                                else:
+                                    raise ValueError("Not coordinates")
+                            except ValueError:
+                                # Find by text in probes
+                                probe = next((p for p in self.probes if args.lower() in p.get("text", "").lower()), None)
+                                if probe:
+                                    await self.motion_controller.seek_only(probe["cx"], probe["cy"], probe.get("text", ""))
+                                else:
+                                    print(f"✗ not found: {args}")
+                        finally:
+                            await self.motion_controller.stop()
+                        print(f"✓ seek '{args}'")
+                elif action == "smooth":
+                    # Smooth click with SEEK → HOVER → CLICK state machine
+                    if self.motion_controller:
+                        await self.motion_controller.start()
+                        try:
+                            # Try to parse as coordinates first
+                            coords = args.split()
+                            try:
+                                if len(coords) == 2:
+                                    x, y = float(coords[0]), float(coords[1])
+                                    await self.motion_controller.seek_and_click(x, y)
+                                else:
+                                    raise ValueError("Not coordinates")
+                            except ValueError:
+                                # Find by text in probes
+                                probe = next((p for p in self.probes if args.lower() in p.get("text", "").lower()), None)
+                                if probe:
+                                    await self.motion_controller.seek_and_click(probe["cx"], probe["cy"], probe.get("text", ""))
+                                else:
+                                    print(f"✗ not found: {args}")
+                        finally:
+                            await self.motion_controller.stop()
+                        print(f"✓ smooth click '{args}'")
                 else:
                     print(f"Unknown: {action}")
                     

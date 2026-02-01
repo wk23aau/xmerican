@@ -104,6 +104,83 @@ class CDPClient:
             message["params"] = params
         await self.ws.send(json.dumps(message))
         
+    async def init_cursor_visual(self):
+        """Initialize persistent visual cursor on the page"""
+        await self.send("Runtime.evaluate", {
+            "expression": """
+            (function() {
+                // Remove existing cursor if any
+                var old = document.getElementById('__xclick_cursor__');
+                if (old) old.remove();
+                
+                // Create visual cursor element
+                var cursor = document.createElement('div');
+                cursor.id = '__xclick_cursor__';
+                cursor.innerHTML = `
+                    <div style="
+                        width: 20px;
+                        height: 20px;
+                        border: 2px solid #00ff00;
+                        border-radius: 50%;
+                        background: rgba(0, 255, 0, 0.2);
+                        box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+                    "></div>
+                    <div style="
+                        position: absolute;
+                        top: 8px;
+                        left: 8px;
+                        width: 4px;
+                        height: 4px;
+                        background: #00ff00;
+                        border-radius: 50%;
+                    "></div>
+                `;
+                cursor.style.cssText = `
+                    position: fixed;
+                    left: 0px;
+                    top: 0px;
+                    width: 20px;
+                    height: 20px;
+                    pointer-events: none;
+                    z-index: 999998;
+                    transform: translate(-10px, -10px);
+                    transition: left 0.016s linear, top 0.016s linear;
+                `;
+                document.body.appendChild(cursor);
+                
+                // Store reference for updates
+                window.__xclick_cursor = cursor;
+            })();
+            """
+        })
+        
+    async def update_cursor_visual(self, x: float, y: float):
+        """Update visual cursor position"""
+        await self.send_no_wait("Runtime.evaluate", {
+            "expression": f"""
+            (function() {{
+                var cursor = window.__xclick_cursor || document.getElementById('__xclick_cursor__');
+                if (cursor) {{
+                    cursor.style.left = '{x}px';
+                    cursor.style.top = '{y}px';
+                }}
+            }})();
+            """
+        })
+        
+    async def mouse_move(self, x: float, y: float, update_visual: bool = True):
+        """Move mouse with visual cursor update"""
+        # Update visual cursor position
+        if update_visual:
+            await self.update_cursor_visual(x, y)
+        
+        # Dispatch mouse move event
+        await self.send_no_wait("Input.dispatchMouseEvent", {
+            "type": "mouseMoved",
+            "x": x,
+            "y": y
+        })
+        
     async def screenshot(self) -> str:
         """Capture screenshot as base64"""
         result = await self.send("Page.captureScreenshot", {"format": "png"})
