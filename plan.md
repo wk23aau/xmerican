@@ -612,3 +612,130 @@ If you want, I can write the exact patch-level changes:
 * how to expose “predicted bbox” to motion_controller
 
 But your correction stands: **IoU is already there, and I missed it.**
+Extracted **`/mnt/data/xCLICK_v2.4.zip`**, analyzed it, and compared it to **v2.3** (the one you previously uploaded).
+
+## 1) File-level compare (v2.3 → v2.4)
+
+### Added
+
+* ✅ `ocr_module.py` (new)
+
+### Modified
+
+* ✅ `world_state.py` (changed)
+
+### Unchanged (byte-identical)
+
+* `README.md`
+* `cdp_client.py`
+* `config.py`
+* `motion_controller.py`
+* `overlay.py`
+* `perception_loop.py`
+* `roi_mask.py`
+* `tracker.py`
+* `vision_module.py`
+* `xclick.py`
+
+So: **v2.4 is basically “OCR module added + tracker wired into world state.”** Nothing else moved.
+
+---
+
+## 2) What exactly changed in `world_state.py`
+
+### ✅ Tracker is now actually wired (this fixes your “tracker exists but not used” gap)
+
+In v2.4:
+
+* `world_state.py` now imports:
+
+```py
+from tracker import get_tracker, KalmanTracker
+```
+
+* Each `TrackedObject` now has predicted fields + properties:
+
+```py
+_predicted_cx: Optional[float] = None
+_predicted_cy: Optional[float] = None
+
+@property
+def predicted_position(self): ...
+```
+
+* During `update_from_detections()` it now:
+
+  * uses `time.monotonic()`
+  * calls `tracker.update(obj_id, cx, cy, now)`
+  * calls `tracker.predict(obj_id, now)`
+  * stores prediction into `_predicted_cx/_predicted_cy`
+
+Also initializes the tracker for **new** objects immediately:
+
+```py
+tracker.update(new_obj.id, cx, cy, now)
+```
+
+### What this means
+
+* You now have **Kalman-smoothed predicted positions** available on every tracked object via:
+
+  * `obj.predicted_cx`, `obj.predicted_cy`, `obj.predicted_position`
+
+But: **nothing else in the repo was changed** to *use* `predicted_position` yet (because `motion_controller.py` didn’t change). So it’s “available”, not “exploited.”
+
+---
+
+## 3) What’s in `ocr_module.py`
+
+It’s a standalone OCR helper that:
+
+* checks for EasyOCR availability
+* lazy-loads an EasyOCR reader (English, `gpu=True`)
+* can OCR a **cropped region** of a screenshot by bbox:
+
+  * `extract_text_from_region(screenshot_bytes, bbox, padding=5)`
+* supports batch calls (but implemented as a simple loop)
+
+### Important: It is **not integrated**
+
+Because `vision_module.py` and `xclick.py` did **not** change, nothing calls `ocr_module.py` in v2.4.
+
+So your gap **A (OCR fallback)** is still effectively **not solved in runtime behavior**, even though the module exists now.
+
+---
+
+## 4) Quick verdict: what v2.4 achieved vs your stated gaps
+
+### Fixed / improved
+
+* ✅ **Tracker wire-up (Gap C)**: now actually connected inside `world_state.py`
+
+### Still not achieved (behaviorally)
+
+* ❌ **OCR fallback (Gap A)**: module exists, but no call path → vision pipeline won’t use it
+* ❌ Any improvement to “button at x,y is Submit” for canvas/WebGL: still missing unless you wire OCR into `vision_module.py`
+
+---
+
+## 5) Concrete next step (smallest patch that makes OCR real)
+
+Right now `vision_module.py` does YOLO → `elementFromPoint()` labeling. The clean integration is:
+
+* If label from DOM-at-point is empty/weak:
+
+  * OCR the YOLO bbox from the same screenshot bytes
+  * set label to OCR text if decent
+
+That requires **only**:
+
+1. import `extract_text_from_region` from `ocr_module.py`
+2. pass screenshot bytes through the labeling stage
+
+If you want, I can write the exact patch for `vision_module.py` (minimal diff) so v2.5 actually *uses* OCR.
+
+Just say whether you want OCR to run:
+
+* **only when DOM label is empty** (fastest), or
+* **always for vision boxes** (slowest), or
+* **adaptive** (only for certain classes / sizes / confidence).

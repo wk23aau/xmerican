@@ -462,9 +462,24 @@ class VisionModule:
             if dom_info and dom_info.get("label"):
                 label = dom_info["label"][:50]  # Truncate
                 label_source = "dom"
-            elif self.use_ocr:
-                # TODO: OCR fallback for canvas elements
-                pass
+            elif self.use_ocr and png_bytes:
+                # OCR fallback for canvas/WebGL elements (2026: EasyOCR)
+                try:
+                    from ocr_module import extract_text_from_region, is_ocr_available
+                    if is_ocr_available():
+                        # Convert CSS bbox to pixel bbox for OCR
+                        px_bbox = (
+                            css_bbox[0] * dpr,
+                            css_bbox[1] * dpr,
+                            css_bbox[2] * dpr,
+                            css_bbox[3] * dpr
+                        )
+                        ocr_text = extract_text_from_region(png_bytes, px_bbox)
+                        if ocr_text and len(ocr_text.strip()) > 0:
+                            label = ocr_text[:50]  # Truncate
+                            label_source = "ocr"
+                except Exception as e:
+                    pass  # OCR failed, continue without label
                 
             # Create labeled probe
             self._probe_id_counter += 1
