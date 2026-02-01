@@ -21,12 +21,12 @@ class ObjectSource(Enum):
 
 @dataclass
 class TrackedObject:
-    """A UI element tracked across frames"""
+    """A UI element tracked across frames with Kalman prediction"""
     id: int
     label: str
     bbox: Tuple[float, float, float, float]  # x1, y1, x2, y2 in CSS pixels
-    cx: float  # Center X
-    cy: float  # Center Y
+    cx: float  # Center X (measured)
+    cy: float  # Center Y (measured)
     obj_type: str  # button, input, link, etc.
     confidence: float
     source: ObjectSource
@@ -41,6 +41,25 @@ class TrackedObject:
     dom_id: Optional[str] = None
     tag: Optional[str] = None
     role: Optional[str] = None
+    
+    # Kalman-predicted position (updated by world state)
+    _predicted_cx: Optional[float] = None
+    _predicted_cy: Optional[float] = None
+    
+    @property
+    def predicted_cx(self) -> float:
+        """Get predicted X position (Kalman-smoothed) or measured if unavailable"""
+        return self._predicted_cx if self._predicted_cx is not None else self.cx
+    
+    @property
+    def predicted_cy(self) -> float:
+        """Get predicted Y position (Kalman-smoothed) or measured if unavailable"""
+        return self._predicted_cy if self._predicted_cy is not None else self.cy
+    
+    @property
+    def predicted_position(self) -> Tuple[float, float]:
+        """Get predicted (x, y) position for smooth motion targeting"""
+        return (self.predicted_cx, self.predicted_cy)
     
     def update(self, new_bbox: Tuple[float, float, float, float], 
                new_confidence: float, new_label: Optional[str] = None):
@@ -182,6 +201,10 @@ class WorldState:
         """
         self.frame_count += 1
         self.last_perception_time = time.time()
+        now = time.monotonic()
+        
+        # Get Kalman tracker singleton
+        tracker = get_tracker()
         
         updated_objects = []
         
@@ -198,6 +221,15 @@ class WorldState:
                 # Update existing object
                 existing.update(bbox, confidence, label)
                 existing.source = source
+                
+                # Update Kalman tracker with new measurement
+                tracker.update(existing.id, existing.cx, existing.cy, now)
+                
+                # Get predicted position for smooth motion
+                pred = tracker.predict(existing.id, now)
+                if pred:
+                    existing._predicted_cx, existing._predicted_cy = pred
+                
                 updated_objects.append(existing)
             else:
                 # Create new tracked object
@@ -217,6 +249,10 @@ class WorldState:
                     tag=det.get("tag"),
                     role=det.get("role")
                 )
+                
+                # Initialize Kalman tracker for new object
+                tracker.update(new_obj.id, cx, cy, now)
+                
                 self.objects[new_obj.id] = new_obj
                 updated_objects.append(new_obj)
         
