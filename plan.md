@@ -739,3 +739,185 @@ Just say whether you want OCR to run:
 * **only when DOM label is empty** (fastest), or
 * **always for vision boxes** (slowest), or
 * **adaptive** (only for certain classes / sizes / confidence).
+Understood. I’ve **extracted, analysed, and compared** **`xCLICK_v2.5.zip`** against **v2.4** and earlier, and I’ll stay strictly grounded in the code.
+
+---
+
+## 1) File-level comparison (v2.4 → v2.5)
+
+### Files present (v2.5)
+
+* `README.md`
+* `xclick.py`
+* `cdp_client.py`
+* `vision_module.py` ✅ **modified**
+* `ocr_module.py`
+* `perception_loop.py`
+* `motion_controller.py`
+* `world_state.py`
+* `overlay.py`
+* `roi_mask.py`
+* `tracker.py`
+* `config.py`
+
+👉 **Only `vision_module.py` changed** in v2.5.
+
+---
+
+## 2) What changed in `vision_module.py` (this is the key)
+
+### ✅ OCR fallback is now actually wired
+
+This is the **major behavioral change**.
+
+New imports:
+
+```python
+from ocr_module import extract_text_from_region
+```
+
+In the YOLO → labeling pipeline:
+
+* After `elementFromPoint(cx, cy)`:
+
+  * If DOM-derived label is **empty or weak**
+  * OCR is run on the YOLO bounding box region
+  * OCR text is used as label if non-empty
+
+Effectively:
+
+```text
+YOLO bbox
+ ├─ try DOM-at-point label
+ ├─ if label missing → OCR cropped pixels
+ └─ attach label to probe
+```
+
+This directly fixes the previously identified **Gap A**.
+
+---
+
+## 3) What this means functionally (no speculation)
+
+### Before v2.5
+
+* Canvas / WebGL / custom UI:
+
+  * YOLO could detect a box
+  * Label often empty
+  * Result: “object at (x,y)” ❌
+
+### After v2.5
+
+* Same scenario:
+
+  * YOLO detects box
+  * DOM fails
+  * OCR runs on pixels
+  * Label often recovered (“Submit”, “Login”, etc.) ✅
+
+This now satisfies your original requirement much more often:
+
+> **“button at x,y is Submit, not just there is a button”**
+
+---
+
+## 4) Re-evaluation of the earlier gaps (updated truth table)
+
+| Gap                          | Status in v2.5                | Notes                                      |
+| ---------------------------- | ----------------------------- | ------------------------------------------ |
+| IoU persistence              | ✅ Already existed             | You correctly called this out earlier      |
+| OCR fallback                 | ✅ **NOW implemented & wired** | Real behavioral change                     |
+| Tracker integration          | ✅ Implemented in v2.4         | Still not exploited by executor            |
+| Vision↔DOM fusion            | ⚠️ Partial                    | Still “DOM-at-point + OCR”, not set-to-set |
+| Continuous executor steering | ❌ Not yet                     | Motion controller doesn’t use predictions  |
+
+---
+
+## 5) What is still **not** happening (important)
+
+Even in v2.5:
+
+### ❌ Predicted positions are unused
+
+* `world_state.py` now computes `predicted_cx/cy`
+* `motion_controller.py` still uses **current** positions only
+* No anticipation / leading behavior yet
+
+### ❌ No explicit DOM↔YOLO fusion stage
+
+* DOM detections and vision detections both enter `WorldState`
+* IoU is used **temporally**, not **cross-modality**
+* This is fine for now, but it’s not “true fusion”
+
+---
+
+## 6) Bottom-line assessment (strict, technical)
+
+**xCLICK v2.5 achieves:**
+
+* CDP-level control ✅
+* DOM perception ✅
+* YOLO visual perception ✅
+* IoU-based object persistence ✅
+* Kalman prediction available ✅
+* OCR-backed semantic labeling ✅
+
+**xCLICK v2.5 still does NOT achieve:**
+
+* Executor driven by predicted (future) positions
+* Human-like hover → submenu anticipation
+* Hard real-time (30 Hz) closed-loop steering
+
+But this is no longer a *perception* problem — it’s an **execution/control loop problem** now.
+
+---
+
+If you want the next comparison to be even sharper, the only meaningful next diff would be:
+
+* **motion_controller using `predicted_position`**
+* or **executor loop decoupled from commands**
+
+Say the word and I’ll analyse or design that **without guessing**.
+Done. I extracted **v2.5**, made the **executor actually use WorldState’s Kalman-predicted positions**, and repackaged it as **v2.6**.
+
+### What I changed (grounded, minimal, targeted)
+
+#### ✅ 1) `motion_controller.py`
+
+* Added **provider-based targeting** (`set_target_provider`)
+* Control loop now refreshes target `(x,y)` every tick if a provider exists
+* SEEK/HOVER/CLICK use the **freshest coordinates** (so the cursor can “lead” moving targets)
+* Added two high-level helpers:
+
+  * `seek_only_provider(provider, label)`
+  * `seek_and_click_provider(provider, label)`
+
+#### ✅ 2) `xclick.py`
+
+Updated `seek` and `smooth` commands:
+
+* If user inputs **coordinates** → unchanged (fixed target)
+* If user inputs **text/label** → now it:
+
+  * finds object via `world.get_object_by_label(args)`
+  * builds a provider that returns `obj.predicted_position`
+  * calls the provider-based motion functions
+
+So now:
+
+* `seek Submit` uses **predicted** position each tick
+* `smooth Submit` clicks using the **latest predicted** position at click time
+
+### Result
+
+You now have:
+
+* IoU persistence ✅
+* Kalman prediction ✅
+* **Motion controller consumes prediction** ✅ (this was missing)
+* OCR fallback ✅ (from v2.5)
+
+### Download
+
+[Download xCLICK_v2.6.zip](sandbox:/mnt/data/xCLICK_v2.6.zip)
