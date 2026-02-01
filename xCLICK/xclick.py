@@ -205,12 +205,25 @@ class xClick:
     # ================== VISION METHODS ==================
     
     async def refresh_vision_probes(self):
-        """Detect elements using YOLO + DOM fusion"""
+        """Detect elements using YOLO + DOM fusion, update world state"""
         if not self.vision_enabled or not self.vision_module:
             print("✗ Vision not enabled. Run with --vision flag")
             return []
             
         self.vision_probes = await self.vision_module.detect_labeled_probes()
+        
+        # Update world state with vision detections (ChatGPT gap fix)
+        detections = []
+        for p in self.vision_probes:
+            detections.append({
+                "bbox": [p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3]] if hasattr(p, 'bbox') else [0, 0, 0, 0],
+                "label": p.label if hasattr(p, 'label') else "",
+                "confidence": p.confidence if hasattr(p, 'confidence') else 0.5,
+                "type": p.type if hasattr(p, 'type') else "unknown",
+                "dom_id": p.dom_id if hasattr(p, 'dom_id') else None
+            })
+        self.world.update_from_detections(detections, ObjectSource.VISION)
+        
         return self.vision_probes
         
     async def show_vision_probes(self, show_tabs=True):
