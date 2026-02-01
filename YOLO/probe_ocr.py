@@ -106,8 +106,8 @@ class ProbeOCR:
         x2 = min(w, int(bbox[2] * w) + padding)
         y2 = min(h, int(bbox[3] * h) + padding)
         
-        # Skip tiny regions
-        if (x2 - x1) < 15 or (y2 - y1) < 10:
+        # Skip very tiny regions
+        if (x2 - x1) < 8 or (y2 - y1) < 8:
             return ""
             
         # Check cache
@@ -200,8 +200,7 @@ class ProbeOCR:
         Skips: icon, logo, image - these don't have useful text
         """
         # Only OCR these interactive element types
-        OCR_TYPES = {"button", "link", "input", "checkbox", "dropdown", "menu", "text"}
-        SKIP_TYPES = {"icon", "logo", "image", "close"}
+        SKIP_TYPES = {"icon", "logo", "image"}
         
         result = {}
         ocr_count = 0
@@ -214,10 +213,6 @@ class ProbeOCR:
             
             # Skip non-interactive elements
             if probe_type in SKIP_TYPES:
-                continue
-                
-            # Only OCR interactive elements
-            if probe_type not in OCR_TYPES:
                 continue
                 
             probe_id = probe.get("id")

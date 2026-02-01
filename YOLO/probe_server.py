@@ -40,14 +40,18 @@ class YOLOProbeServer:
         
         # Vision components
         self.frame_capture = FrameCapture()
-        self.detector = ProbeDetector(use_pretrained=True)
+        self.detector = ProbeDetector(use_pretrained=False)
         self.tracker = ProbeTracker()
         self.blocker_detector = BlockerDetector()
         
         # OCR for probe text
         self.ocr = None
         if enable_ocr and OCR_AVAILABLE:
+            print("[YOLO] Initializing OCR...")
             self.ocr = ProbeOCR(use_gpu=False)
+            print(f"[YOLO] OCR ready: {self.ocr.backend}")
+        else:
+            print(f"[YOLO] OCR disabled (enable={enable_ocr}, available={OCR_AVAILABLE})")
         self.probe_texts: Dict[int, str] = {}
         
         # State (perception only)
@@ -104,12 +108,12 @@ class YOLOProbeServer:
                     cursor_pos=(0.5, 0.5)  # Placeholder
                 )
                 
-                # OCR extraction (every 10 frames to save CPU)
-                if self.ocr and self.frame_count % 10 == 0:
+                # DOM text enrichment + filter non-interactive (every 10 frames)
+                if self.frame_count % 10 == 0:
                     world = self.world_manager.get_state()
-                    self.probe_texts = self.ocr.extract_all_probes(frame, world.probes, max_probes=15)
+                    await self._enrich_and_filter_probes(world.probes)
                 
-                # Output probes to file
+                # Output probes to file (filtered)
                 await self._write_probes()
                 
                 # Callback if set
@@ -144,13 +148,17 @@ class YOLOProbeServer:
             await asyncio.sleep(max(0, target_interval - elapsed))
             
     async def _write_probes(self):
-        """Write current probes to JSON file with OCR text"""
+        """Write current probes to JSON file with OCR text (filtered)"""
         world = self.world_manager.get_state()
         
-        # Add text to each probe
+        # Add text to each probe and filter out non-interactive ones
         probes_with_text = []
         for probe in world.probes:
+            # Skip non-interactive probes
+            if probe.get("_skip"):
+                continue
             probe_copy = dict(probe)
+            probe_copy.pop("_skip", None)  # Remove internal flag
             probe_id = probe.get("id")
             if probe_id in self.probe_texts:
                 probe_copy["text"] = self.probe_texts[probe_id]
@@ -171,6 +179,40 @@ class YOLOProbeServer:
         
         with open(self.output_file, "w") as f:
             json.dump(output, f, indent=2, default=str)
+    
+    async def _enrich_and_filter_probes(self, probes):
+        """
+        Use DOM to get text labels for YOLO-detected probes.
+        YOLO provides coordinates, DOM provides text context.
+        Mark non-interactive elements (p, span, div) for removal.
+        """
+        # Tags to skip (non-interactive)
+        skip_tags = {'p', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'label', 'li', 'ul', 'ol', 'section', 'article', 'header', 'footer', 'main', 'nav', 'body', 'html'}
+        
+        # Interactive tags to keep
+        keep_tags = {'button', 'a', 'input', 'select', 'textarea', 'img', 'svg'}
+        
+        for probe in probes[:20]:  # Check more probes
+            try:
+                cx = int(probe.get("cx", 0.5) * VIEWPORT_WIDTH)
+                cy = int(probe.get("cy", 0.5) * VIEWPORT_HEIGHT)
+                
+                elem = await self.cdp.get_element_at(cx, cy)
+                if elem:
+                    tag = elem.get("tag", "").lower()
+                    role = elem.get("role", "").lower()
+                    
+                    # Mark probe for skip if non-interactive
+                    if tag in skip_tags and role not in ('button', 'link', 'menuitem', 'tab'):
+                        probe["_skip"] = True
+                        continue
+                    
+                    # Add text for interactive elements
+                    if elem.get("text"):
+                        probe_id = probe.get("id")
+                        self.probe_texts[probe_id] = elem.get("text", "")[:50]
+            except Exception:
+                pass
             
     def get_probes(self):
         """Get current probes (for programmatic access)"""

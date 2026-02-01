@@ -169,7 +169,7 @@ class DebugVisualizer:
         """
         if not self.window_created:
             cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(self.window_name, 600, 960)
+            cv2.resizeWindow(self.window_name, 1280, 720)  # Match viewport exactly
             self.window_created = True
             
         cv2.imshow(self.window_name, frame)

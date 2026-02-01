@@ -2,9 +2,9 @@
 Configuration for YOLO Vision Agent
 """
 
-# Frame capture settings
-VIEWPORT_WIDTH = 400
-VIEWPORT_HEIGHT = 640
+# Frame capture settings - MUST match actual browser viewport
+VIEWPORT_WIDTH = 1280
+VIEWPORT_HEIGHT = 720
 TARGET_FPS = 30
 FRAME_BUFFER_SIZE = 5
 

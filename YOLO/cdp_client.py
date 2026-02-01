@@ -21,8 +21,14 @@ class CDPClient:
         self.frame_callback: Optional[Callable] = None
         self._listen_task: Optional[asyncio.Task] = None
         
-    async def connect(self, target_url: Optional[str] = None):
-        """Connect to Chrome DevTools Protocol"""
+    async def connect(self, target_url: Optional[str] = None, set_viewport: bool = True):
+        """Connect to Chrome DevTools Protocol
+        
+        Args:
+            target_url: Optional URL to filter target pages
+            set_viewport: If True, set viewport to config dimensions. Set to False
+                         if another process is managing viewport (prevents flickering)
+        """
         # Get available targets
         import aiohttp
         async with aiohttp.ClientSession() as session:
@@ -44,6 +50,16 @@ class CDPClient:
         self.ws = await websockets.connect(ws_url)
         self._listen_task = asyncio.create_task(self._listen())
         print(f"Connected to {page_target['url']}")
+        
+        # Set exact viewport size to match config (only if requested)
+        if set_viewport:
+            await self.send("Emulation.setDeviceMetricsOverride", {
+                "width": VIEWPORT_WIDTH,
+                "height": VIEWPORT_HEIGHT,
+                "deviceScaleFactor": 1,
+                "mobile": False
+            })
+            print(f"Viewport set to {VIEWPORT_WIDTH}x{VIEWPORT_HEIGHT}")
         
     async def _listen(self):
         """Listen for CDP messages"""
@@ -115,11 +131,11 @@ class CDPClient:
         
         await self.ws.send(json.dumps(message))
             
-    async def start_screencast(self, callback: Callable, quality: int = 80):
+    async def start_screencast(self, callback: Callable, quality: int = 100):
         """Start receiving screen frames"""
         self.frame_callback = callback
         await self.send("Page.startScreencast", {
-            "format": "jpeg",
+            "format": "png",  # PNG for best quality
             "quality": quality,
             "maxWidth": VIEWPORT_WIDTH,
             "maxHeight": VIEWPORT_HEIGHT
@@ -128,6 +144,11 @@ class CDPClient:
     async def stop_screencast(self):
         """Stop receiving screen frames"""
         await self.send("Page.stopScreencast")
+        
+    async def screenshot(self) -> str:
+        """Capture screenshot as base64"""
+        result = await self.send("Page.captureScreenshot", {"format": "png"})
+        return result.get("result", {}).get("data", "")
         self.frame_callback = None
         
     async def mouse_move(self, x: float, y: float):
@@ -138,16 +159,57 @@ class CDPClient:
             "y": int(y * VIEWPORT_HEIGHT)
         })
         
-    async def mouse_click(self, x: float, y: float, button: str = "left"):
-        """Click at position (normalized 0-1 coords)"""
-        px = int(x * VIEWPORT_WIDTH)
-        py = int(y * VIEWPORT_HEIGHT)
+    async def mouse_click(self, x: int, y: int, button: str = "left", show_marker: bool = True):
+        """Click at position (pixel coordinates)
+        
+        Args:
+            x: X pixel coordinate
+            y: Y pixel coordinate
+            button: Mouse button (left/right/middle)
+            show_marker: If True, draw a visual marker at click location
+        """
+        # Draw visual click marker on the page
+        if show_marker:
+            await self.send("Runtime.evaluate", {
+                "expression": f"""
+                (function() {{
+                    // Remove old marker
+                    var old = document.getElementById('__click_marker__');
+                    if (old) old.remove();
+                    
+                    // Create marker
+                    var marker = document.createElement('div');
+                    marker.id = '__click_marker__';
+                    marker.style.cssText = `
+                        position: fixed;
+                        left: {x - 15}px;
+                        top: {y - 15}px;
+                        width: 30px;
+                        height: 30px;
+                        border: 3px solid red;
+                        border-radius: 50%;
+                        pointer-events: none;
+                        z-index: 999999;
+                        box-shadow: 0 0 10px red;
+                    `;
+                    document.body.appendChild(marker);
+                    
+                    // Animate and remove
+                    setTimeout(function() {{
+                        marker.style.transform = 'scale(2)';
+                        marker.style.opacity = '0';
+                        marker.style.transition = 'all 0.3s';
+                    }}, 100);
+                    setTimeout(function() {{ marker.remove(); }}, 500);
+                }})();
+                """
+            })
         
         # Mouse down
         await self.send_no_wait("Input.dispatchMouseEvent", {
             "type": "mousePressed",
-            "x": px,
-            "y": py,
+            "x": x,
+            "y": y,
             "button": button,
             "clickCount": 1
         })
@@ -157,8 +219,8 @@ class CDPClient:
         # Mouse up
         await self.send_no_wait("Input.dispatchMouseEvent", {
             "type": "mouseReleased",
-            "x": px,
-            "y": py,
+            "x": x,
+            "y": y,
             "button": button,
             "clickCount": 1
         })
@@ -174,13 +236,9 @@ class CDPClient:
         })
         
     async def type_text(self, text: str):
-        """Type text character by character"""
-        for char in text:
-            await self.send("Input.dispatchKeyEvent", {
-                "type": "char",
-                "text": char
-            })
-            await asyncio.sleep(0.02)
+        """Type text using insertText (most reliable)"""
+        # Use insertText for bulk text entry
+        await self.send("Input.insertText", {"text": text})
             
     async def press_key(self, key: str):
         """Press a special key (Enter, Tab, Escape, etc.)"""
@@ -214,6 +272,54 @@ class CDPClient:
             "expression": "window.location.href"
         })
         return result.get("result", {}).get("result", {}).get("value", "")
+    
+    async def get_element_at(self, x: int, y: int) -> dict:
+        """Get element info at coordinates using DOM"""
+        js = f"""
+            (function() {{
+                var el = document.elementFromPoint({x}, {y});
+                if (!el) return null;
+                var rect = el.getBoundingClientRect();
+                return {{
+                    tag: el.tagName.toLowerCase(),
+                    text: (el.innerText || el.value || el.placeholder || el.alt || el.title || '').trim().substring(0, 50),
+                    role: el.getAttribute('role') || '',
+                    type: el.getAttribute('type') || '',
+                    href: el.getAttribute('href') || '',
+                    bbox: [rect.left, rect.top, rect.right, rect.bottom]
+                }};
+            }})()
+        """
+        result = await self.send("Runtime.evaluate", {"expression": js, "returnByValue": True})
+        return result.get("result", {}).get("result", {}).get("value", {})
+    
+    async def get_all_clickables(self) -> list:
+        """Get all clickable elements with text from DOM"""
+        js = """
+            (function() {
+                var results = [];
+                var selectors = 'button, a, input, [role="button"], [onclick], [class*="btn"]';
+                var elements = document.querySelectorAll(selectors);
+                elements.forEach(function(el) {
+                    var rect = el.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        var text = (el.innerText || el.value || el.placeholder || el.alt || el.title || el.getAttribute('aria-label') || '').trim().substring(0, 50);
+                        if (text || el.tagName === 'INPUT') {
+                            results.push({
+                                tag: el.tagName.toLowerCase(),
+                                text: text,
+                                cx: Math.round(rect.left + rect.width/2),
+                                cy: Math.round(rect.top + rect.height/2),
+                                bbox: [rect.left, rect.top, rect.right, rect.bottom]
+                            });
+                        }
+                    }
+                });
+                return results;
+            })()
+        """
+        result = await self.send("Runtime.evaluate", {"expression": js, "returnByValue": True})
+        return result.get("result", {}).get("result", {}).get("value", [])
         
     async def close(self):
         """Close CDP connection"""
@@ -221,3 +327,4 @@ class CDPClient:
             self._listen_task.cancel()
         if self.ws:
             await self.ws.close()
+

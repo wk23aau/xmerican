@@ -40,22 +40,31 @@ class Probe:
         
 
 class ProbeDetector:
-    def __init__(self, model_path: str = MODEL_PATH, use_pretrained: bool = True):
+    def __init__(self, model_path: str = MODEL_PATH, use_pretrained: bool = False):
         """
         Initialize probe detector
         
         Args:
             model_path: Path to YOLO model weights
-            use_pretrained: If True, use pretrained COCO model (fallback for quick start)
+            use_pretrained: If True, use pretrained COCO model (fallback)
         """
         self.use_pretrained = use_pretrained
         
-        if use_pretrained:
-            # Use pretrained YOLOv8 - maps COCO classes to UI concepts
+        # Try OmniParser first (best for UI detection)
+        omniparser_path = "models/icon_detect/model.pt"
+        import os
+        if os.path.exists(omniparser_path) and not use_pretrained:
+            print("[YOLO] Using OmniParser icon detection model")
+            self.model = YOLO(omniparser_path)
+            self.class_mapping = None  # OmniParser has UI-specific classes
+        elif use_pretrained:
+            # Fallback to pretrained YOLOv8 - maps COCO classes to UI concepts
+            print("[YOLO] Using pretrained YOLOv8n (COCO)")
             self.model = YOLO("yolov8n.pt")
             self.class_mapping = self._create_coco_to_ui_mapping()
         else:
             # Use fine-tuned UI model
+            print(f"[YOLO] Using custom model: {model_path}")
             self.model = YOLO(model_path)
             self.class_mapping = None
             
@@ -126,11 +135,11 @@ class ProbeDetector:
             aspect_ratio = bw / max(bh, 1)
             
             # Button-like: reasonable size, not too elongated
-            if area < 500 or area > (w * h * 0.5):
+            if area < 200 or area > (w * h * 0.5):  # Lowered from 500
                 continue
-            if aspect_ratio < 0.2 or aspect_ratio > 10:
+            if aspect_ratio < 0.15 or aspect_ratio > 12:  # More permissive
                 continue
-            if bw < 20 or bh < 15:
+            if bw < 15 or bh < 10:  # Lowered from 20, 15
                 continue
                 
             # Check if region has enough contrast (likely a control)
@@ -138,7 +147,7 @@ class ProbeDetector:
             if roi.size == 0:
                 continue
             std = np.std(roi)
-            if std < 10:  # Too uniform
+            if std < 5:  # Lowered from 10 - Too uniform
                 continue
                 
             # Normalize coordinates
