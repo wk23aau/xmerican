@@ -197,6 +197,53 @@ class CDPClient:
         })
         return result.get("result", {}).get("result", {}).get("value", "")
         
+    async def get_viewport_metrics(self) -> dict:
+        """Get viewport size and device pixel ratio"""
+        result = await self.send("Page.getLayoutMetrics")
+        visual = result.get("result", {}).get("visualViewport", {})
+        return {
+            "width": int(visual.get("clientWidth", VIEWPORT_WIDTH)),
+            "height": int(visual.get("clientHeight", VIEWPORT_HEIGHT)),
+            "dpr": float(visual.get("scale", 1.0)),
+            "scroll_x": float(visual.get("pageX", 0)),
+            "scroll_y": float(visual.get("pageY", 0)),
+        }
+        
+    async def probe_element_at(self, css_x: float, css_y: float) -> dict:
+        """Query DOM element at CSS coordinates"""
+        js = f"""
+        (function() {{
+            var el = document.elementFromPoint({css_x}, {css_y});
+            if (!el) return null;
+            
+            var rect = el.getBoundingClientRect();
+            var label = 
+                el.getAttribute('aria-label') ||
+                el.getAttribute('title') ||
+                (el.innerText || '').trim().substring(0, 50) ||
+                (el.value || '').trim() ||
+                (el.placeholder || '').trim() ||
+                el.getAttribute('alt') || null;
+                
+            if (label) label = label.replace(/\\n/g, ' ').trim();
+            
+            return {{
+                tag: el.tagName.toLowerCase(),
+                id: el.id || null,
+                classes: el.className || null,
+                label: label,
+                role: el.getAttribute('role') || null,
+                type: el.getAttribute('type') || null,
+                rect: {{ x: rect.left, y: rect.top, w: rect.width, h: rect.height }}
+            }};
+        }})()
+        """
+        result = await self.send("Runtime.evaluate", {
+            "expression": js,
+            "returnByValue": True
+        })
+        return result.get("result", {}).get("result", {}).get("value") or {}
+        
     async def close(self):
         """Close CDP connection"""
         if self._listen_task:

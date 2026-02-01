@@ -2,41 +2,75 @@
 xCLICK - DOM-based browser automation with visual feedback
 Single process for perception + actions - no viewport flickering
 
+Now with YOLO vision integration for labeled probe detection!
+
 Usage:
     python xclick.py --debug    # With visual debug window
     python xclick.py            # Without debug
+    python xclick.py --vision   # Enable YOLO vision mode
     
 Commands:
-    click <text>     - Click element by text
+    click <text>     - Click element by text (DOM)
     click <x> <y>    - Click at coordinates
+    vclick <label>   - Click element by vision label (YOLO+DOM)
+    vprobes / vp     - Show YOLO-detected elements with labels
+    vscan            - Capture and save annotated debug image
     type <text>      - Type text
     press <key>      - Press key (Enter, Tab, etc)
     goto <url>       - Navigate to URL
-    probes / p       - Show detected elements
+    probes / p       - Show DOM-detected elements
     wait <seconds>   - Wait
     exit / q         - Quit
 """
 
 import asyncio
 import argparse
+import os
 from typing import Dict, List, Optional
 from cdp_client import CDPClient
-from config import VIEWPORT_WIDTH, VIEWPORT_HEIGHT
+from config import VIEWPORT_WIDTH, VIEWPORT_HEIGHT, YOLO_MODEL_PATH, USE_OCR_FALLBACK, VISION_MODEL_TYPE
 
 
 class xClick:
-    """DOM-based browser automation with visual click feedback"""
+    """DOM-based browser automation with visual click feedback + YOLO vision"""
     
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False, vision: bool = False):
         self.cdp = CDPClient()
         self.probes: List[Dict] = []
+        self.vision_probes: List = []  # LabeledProbe objects from vision
         self.debug = debug
+        self.vision_enabled = vision
+        self.vision_module = None
         
     async def connect(self):
         """Connect to browser"""
         print("Connecting to browser...")
         await self.cdp.connect(set_viewport=True)
         print("Connected!")
+        
+        # Initialize vision module if enabled
+        if self.vision_enabled:
+            await self.init_vision()
+            
+    async def init_vision(self):
+        """Initialize YOLO vision module"""
+        try:
+            from vision_module import VisionModule
+            self.vision_module = VisionModule(
+                self.cdp,
+                model_path=YOLO_MODEL_PATH,
+                use_ocr=USE_OCR_FALLBACK,
+                model_type=VISION_MODEL_TYPE
+            )
+            await self.vision_module.init_model()
+            self.vision_enabled = True
+            print("✓ Vision module initialized")
+        except ImportError as e:
+            print(f"✗ Vision module not available: {e}")
+            self.vision_enabled = False
+        except Exception as e:
+            print(f"✗ Vision init failed: {e}")
+            self.vision_enabled = False
         
     async def refresh_probes(self) -> List[Dict]:
         """Query DOM for all interactive elements"""
@@ -94,9 +128,20 @@ class xClick:
         self.probes = result.get("result", {}).get("result", {}).get("value", []) or []
         return self.probes
         
-    def show_probes(self):
-        """Display detected elements"""
-        print(f"\n─── {len(self.probes)} elements ───")
+    async def show_probes(self, show_tabs=True):
+        """Display detected elements with tab awareness"""
+        # Get tab info for world state
+        tab_info = ""
+        if show_tabs:
+            tabs = await self.get_tabs()
+            current_tab = 0  # We're always on the first in list after switch
+            for i, t in enumerate(tabs):
+                if t.get("attached"):
+                    current_tab = i
+                    break
+            tab_info = f" [Tab {current_tab+1}/{len(tabs)}]"
+        
+        print(f"\n─── {len(self.probes)} elements{tab_info} ───")
         for p in self.probes:
             text = p.get("text", "")
             ptype = p.get("type", "?")
@@ -106,6 +151,83 @@ class xClick:
             else:
                 print(f"  [{p['id']:2}] {ptype:8} ({cx},{cy})")
         print("───────────────\n")
+        
+    # ================== VISION METHODS ==================
+    
+    async def refresh_vision_probes(self):
+        """Detect elements using YOLO + DOM fusion"""
+        if not self.vision_enabled or not self.vision_module:
+            print("✗ Vision not enabled. Run with --vision flag")
+            return []
+            
+        self.vision_probes = await self.vision_module.detect_labeled_probes()
+        return self.vision_probes
+        
+    async def show_vision_probes(self, show_tabs=True):
+        """Display YOLO-detected elements with labels and tab info"""
+        # Get tab info for world state
+        tab_info = ""
+        if show_tabs:
+            tabs = await self.get_tabs()
+            tab_info = f" [Tab 1/{len(tabs)}]"
+        
+        print(f"\n─── VISION: {len(self.vision_probes)} elements{tab_info} ───")
+        for p in self.vision_probes:
+            label_str = f"'{p.label[:30]}'" if p.label else ""
+            print(f"  [{p.id:2}] {p.type:8} {label_str:32} ({p.cx:.0f},{p.cy:.0f}) [{p.confidence:.2f}]")
+        print("─────────────────────────────\n")
+        
+    async def vclick_text(self, query: str) -> bool:
+        """Find and click element by vision label"""
+        if not self.vision_enabled or not self.vision_module:
+            print("✗ Vision not enabled. Run with --vision flag")
+            return False
+            
+        # Refresh if no probes
+        if not self.vision_probes:
+            await self.refresh_vision_probes()
+            
+        # Find by label
+        probe = self.vision_module.find_probe_by_label(self.vision_probes, query)
+        
+        if not probe:
+            # Retry with fresh detection
+            await self.refresh_vision_probes()
+            probe = self.vision_module.find_probe_by_label(self.vision_probes, query)
+            
+        if probe:
+            cx, cy = int(probe.cx), int(probe.cy)
+            await self.cdp.mouse_click(cx, cy)
+            label_str = f"'{probe.label}'" if probe.label else f"({probe.type})"
+            print(f"✓ vclick {label_str} ({cx}, {cy})")
+            return True
+            
+        print(f"✗ not found: '{query}'")
+        return False
+        
+    async def save_vision_scan(self, path: str = None):
+        """Capture annotated screenshot for debugging"""
+        if not self.vision_enabled or not self.vision_module:
+            print("✗ Vision not enabled. Run with --vision flag")
+            return
+            
+        # Detect probes
+        probes = await self.vision_module.detect_labeled_probes()
+        self.vision_probes = probes
+        
+        # Get annotated frame
+        png_data = await self.vision_module.get_annotated_frame(probes)
+        
+        if png_data:
+            path = path or "vision_scan.png"
+            with open(path, "wb") as f:
+                f.write(png_data)
+            print(f"✓ Saved annotated scan to {path}")
+            print(f"  Detected {len(probes)} elements")
+        else:
+            print("✗ Failed to capture annotated frame")
+            
+    # ================== END VISION METHODS ==================
         
     def find_probe(self, query: str) -> Optional[Dict]:
         """Find element by text"""
@@ -239,26 +361,30 @@ class xClick:
         
     async def run_repl(self):
         """Interactive REPL"""
-        print("""
-╔═══════════════════════════════════════╗
-║  xCLICK - DOM Browser Automation      ║
-╠═══════════════════════════════════════╣
-║ Commands:                             ║
-║   click <text>   - Click by text      ║
-║   click <x> <y>  - Click coordinates  ║
-║   type <text>    - Type text          ║
-║   press <key>    - Press key          ║
-║   goto <url>     - Navigate           ║
-║   probes / p     - Show elements      ║
-║   scroll [amt]   - Scroll down        ║
-║   scrollup [amt] - Scroll up          ║
-║   tabs           - List all tabs      ║
-║   tab <n>        - Switch to tab n    ║
-║   newtab [url]   - Open new tab       ║
-║   closetab       - Close current tab  ║
-║   wait <sec>     - Wait               ║
-║   exit / q       - Quit               ║
-╚═══════════════════════════════════════╝
+        vision_str = " + YOLO Vision" if self.vision_enabled else ""
+        print(f"""
+╔═══════════════════════════════════════════╗
+║  xCLICK - DOM Browser Automation{vision_str:11} ║
+╠═══════════════════════════════════════════╣
+║ DOM Commands:                             ║
+║   click <text>   - Click by text (DOM)    ║
+║   click <x> <y>  - Click coordinates      ║
+║   probes / p     - Show DOM elements      ║
+║                                           ║
+║ Vision Commands: {'(enabled)' if self.vision_enabled else '(--vision)':14}          ║
+║   vprobes / vp   - Show YOLO elements     ║
+║   vclick <label> - Click by vision label  ║
+║   vscan          - Save debug screenshot  ║
+║   vision         - Enable vision mode     ║
+║                                           ║
+║ Other:                                    ║
+║   type <text>    - Type text              ║
+║   press <key>    - Press key              ║
+║   goto <url>     - Navigate               ║
+║   scroll [amt]   - Scroll down            ║
+║   tabs / tab <n> - Tab management         ║
+║   exit / q       - Quit                   ║
+╚═══════════════════════════════════════════╝
 """)
         
         while True:
@@ -277,7 +403,7 @@ class xClick:
                     break
                 elif action in ("probes", "p"):
                     await self.refresh_probes()
-                    self.show_probes()
+                    await self.show_probes()
                 elif action == "goto":
                     await self.goto(args)
                 elif action == "click":
@@ -313,6 +439,21 @@ class xClick:
                     await self.new_tab(url)
                 elif action == "closetab":
                     await self.close_tab()
+                # ===== VISION COMMANDS =====
+                elif action in ("vprobes", "vp"):
+                    await self.refresh_vision_probes()
+                    await self.show_vision_probes()
+                elif action == "vclick":
+                    await self.vclick_text(args)
+                elif action == "vscan":
+                    path = args if args else None
+                    await self.save_vision_scan(path)
+                elif action == "vision":
+                    if not self.vision_enabled:
+                        await self.init_vision()
+                    else:
+                        print("✓ Vision already enabled")
+                # ===== END VISION COMMANDS =====
                 else:
                     print(f"Unknown: {action}")
                     
@@ -328,15 +469,21 @@ class xClick:
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="xCLICK - DOM Browser Automation")
+    parser = argparse.ArgumentParser(description="xCLICK - DOM Browser Automation + YOLO Vision")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("--vision", action="store_true", help="Enable YOLO vision mode")
     args = parser.parse_args()
     
-    xclick = xClick(debug=args.debug)
+    xclick = xClick(debug=args.debug, vision=args.vision)
     await xclick.connect()
     
     await xclick.refresh_probes()
-    xclick.show_probes()
+    await xclick.show_probes()
+    
+    # Also show vision probes if enabled
+    if xclick.vision_enabled:
+        await xclick.refresh_vision_probes()
+        await xclick.show_vision_probes()
     
     try:
         await xclick.run_repl()
