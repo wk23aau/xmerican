@@ -158,6 +158,85 @@ class xClick:
         await asyncio.sleep(seconds)
         print(f"✓ wait {seconds}s")
         
+    async def scroll(self, amount: int = 500):
+        """Scroll down the page"""
+        await self.cdp.send("Runtime.evaluate", {
+            "expression": f"window.scrollBy(0, {amount})"
+        })
+        await asyncio.sleep(0.3)
+        print(f"✓ scroll {amount}px")
+        
+    async def scroll_up(self, amount: int = 500):
+        """Scroll up the page"""
+        await self.cdp.send("Runtime.evaluate", {
+            "expression": f"window.scrollBy(0, -{amount})"
+        })
+        await asyncio.sleep(0.3)
+        print(f"✓ scroll up {amount}px")
+        
+    async def get_tabs(self) -> list:
+        """Get all open browser tabs"""
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"http://{self.cdp.host}:{self.cdp.port}/json") as resp:
+                targets = await resp.json()
+        tabs = [t for t in targets if t.get("type") == "page"]
+        return tabs
+        
+    async def show_tabs(self):
+        """Display all open tabs"""
+        tabs = await self.get_tabs()
+        print(f"\n─── {len(tabs)} tabs ───")
+        for i, tab in enumerate(tabs):
+            title = tab.get("title", "Untitled")[:40]
+            url = tab.get("url", "")[:50]
+            print(f"  [{i}] {title}")
+            print(f"      {url}")
+        print("───────────────\n")
+        return tabs
+        
+    async def switch_tab(self, index: int):
+        """Switch to a different tab by index"""
+        tabs = await self.get_tabs()
+        if 0 <= index < len(tabs):
+            target = tabs[index]
+            # Close current connection and connect to new tab
+            await self.cdp.close()
+            self.cdp = CDPClient()
+            
+            # Connect to specific target
+            ws_url = target["webSocketDebuggerUrl"]
+            import websockets
+            self.cdp.ws = await websockets.connect(ws_url)
+            self.cdp._listen_task = asyncio.create_task(self.cdp._listen())
+            
+            print(f"✓ switched to tab {index}: {target.get('title', '')[:30]}")
+            await self.refresh_probes()
+        else:
+            print(f"✗ invalid tab index: {index}")
+            
+    async def new_tab(self, url: str = "about:blank"):
+        """Open a new tab"""
+        await self.cdp.send("Target.createTarget", {"url": url})
+        await asyncio.sleep(1)
+        # Switch to the new tab
+        tabs = await self.get_tabs()
+        if tabs:
+            await self.switch_tab(len(tabs) - 1)
+        print(f"✓ new tab: {url}")
+        
+    async def close_tab(self):
+        """Close current tab"""
+        await self.cdp.send("Runtime.evaluate", {
+            "expression": "window.close()"
+        })
+        await asyncio.sleep(0.5)
+        # Switch to remaining tab
+        tabs = await self.get_tabs()
+        if tabs:
+            await self.switch_tab(0)
+        print("✓ closed tab")
+        
     async def run_repl(self):
         """Interactive REPL"""
         print("""
@@ -171,6 +250,12 @@ class xClick:
 ║   press <key>    - Press key          ║
 ║   goto <url>     - Navigate           ║
 ║   probes / p     - Show elements      ║
+║   scroll [amt]   - Scroll down        ║
+║   scrollup [amt] - Scroll up          ║
+║   tabs           - List all tabs      ║
+║   tab <n>        - Switch to tab n    ║
+║   newtab [url]   - Open new tab       ║
+║   closetab       - Close current tab  ║
 ║   wait <sec>     - Wait               ║
 ║   exit / q       - Quit               ║
 ╚═══════════════════════════════════════╝
@@ -212,6 +297,22 @@ class xClick:
                 elif action == "wait":
                     secs = float(args) if args else 1.0
                     await self.wait(secs)
+                elif action == "scroll":
+                    amt = int(args) if args else 500
+                    await self.scroll(amt)
+                elif action == "scrollup":
+                    amt = int(args) if args else 500
+                    await self.scroll_up(amt)
+                elif action == "tabs":
+                    await self.show_tabs()
+                elif action == "tab":
+                    idx = int(args) if args else 0
+                    await self.switch_tab(idx)
+                elif action == "newtab":
+                    url = args if args else "about:blank"
+                    await self.new_tab(url)
+                elif action == "closetab":
+                    await self.close_tab()
                 else:
                     print(f"Unknown: {action}")
                     
