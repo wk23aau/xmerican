@@ -1,220 +1,241 @@
 ---
 name: Independent Browsing Agent
-description: An autonomous browser automation agent using Chrome DevTools Protocol (CDP) REPL for web interactions
+description: Autonomous browser automation combining YOLO streaming probes with DOM world state for near-zero latency actions
 ---
 
 # Independent Browsing Agent
 
-This skill enables the agent to operate as an **Independent Browsing Agent** that controls Chrome browser via the Chrome DevTools Protocol (CDP) REPL.
+This skill enables the agent to operate as an **Independent Browsing Agent** that combines:
+- **YOLO Streaming Probes** (30-60 Hz vision)
+- **DOM World State** (structural awareness)
+- **CDP REPL** (action execution)
+
+## Near-Zero Latency Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     YOLO VISION LAYER (30-60 Hz)                    │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐          │
+│  │ CDP Screen-  │───▶│ YOLO Probe   │───▶│ Probe        │          │
+│  │ cast Frames  │    │ Detector     │    │ Tracker      │          │
+│  └──────────────┘    └──────────────┘    └──────────────┘          │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     WORLD STATE (5-20 Hz)                           │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐          │
+│  │ YOLO Probes  │ +  │ DOM Elements │ =  │ Merged World │          │
+│  │ (visual)     │    │ (structural) │    │ State        │          │
+│  └──────────────┘    └──────────────┘    └──────────────┘          │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     ACTION LAYER (Immediate)                        │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐          │
+│  │ FSM Planner  │───▶│ Mouse/Scroll │───▶│ CDP Actions  │          │
+│  │              │    │ Controller   │    │              │          │
+│  └──────────────┘    └──────────────┘    └──────────────┘          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Configuration
 
 | Setting | Value |
 |---------|-------|
-| Viewport | 400×640 (portrait) |
+| Viewport | 400×640 (portrait) or 1280×720 |
 | Debug Port | 9222 |
-| Profile | `$env:TEMP\chrome-debug-profile` |
-
-## Prerequisites
-
-- Google Chrome installed on the system
-- Node.js with `ws` package (`npm install ws`)
-- PowerShell available for process management
+| Vision FPS | 30-60 Hz |
+| Action Rate | 5-20 Hz |
 
 ---
 
-## Workflow
+## Quick Start
 
-### Step 1: Kill All Previous Chrome Processes
-
-Before starting a new browser session, terminate all existing Chrome processes to ensure a clean state.
-
-```powershell
-Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Sleep -Seconds 2
-```
-
----
-
-### Step 2: Start Chrome with Remote Debugging (400×640 Viewport)
-
-Launch Chrome in **portrait mode** (400×640) with remote debugging enabled.
-
+### 1. Start Chrome with Debugging
 ```powershell
 $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-$debugPort = 9222
-$userDataDir = "$env:TEMP\chrome-debug-profile"
-
-Start-Process -FilePath $chromePath -ArgumentList @(
-    "--remote-debugging-port=$debugPort",
-    "--user-data-dir=$userDataDir",
-    "--window-size=400,640",
-    "--window-position=0,0",
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--disable-extensions",
-    "--disable-popup-blocking"
+Start-Process $chromePath -ArgumentList @(
+    "--remote-debugging-port=9222",
+    "--user-data-dir=$env:TEMP\chrome-debug-profile",
+    "--window-size=400,640"
 )
 ```
 
-**Flags:**
-- `--window-size=400,640`: Fixed portrait viewport
-- `--remote-debugging-port=9222`: CDP connection port
-- `--user-data-dir`: Non-default profile directory
+### 2. Run YOLO Agent with Debug Overlay
+```bash
+cd YOLO
+python main.py --debug
+```
+
+### 3. Watch Bounding Boxes in Real-Time
+A separate window shows:
+- Green boxes = buttons
+- Orange boxes = links
+- Cyan boxes = inputs
+- Red overlay = blockers/modals
 
 ---
 
-### Step 3: Start Interactive CDP REPL Session
+## Dual World State
 
-The CDP REPL **must be used interactively** for browser automation. Start the REPL session and keep it running.
+The agent combines **two perception sources**:
 
-**Install dependency first:**
-```powershell
-npm install ws
+### YOLO Probes (Vision)
+```json
+{
+  "id": 5,
+  "type": "button",
+  "bbox": [0.12, 0.45, 0.28, 0.52],
+  "cx": 0.20,
+  "cy": 0.485,
+  "score": 0.92
+}
+```
+- **Fast**: Updates every 16-33ms
+- **Visual**: Detects anything that looks clickable
+- **Robust**: Works on canvas, images, iframes
+
+### DOM Elements (Structure)
+```json
+{
+  "id": "el_3",
+  "tag": "button",
+  "label": "Submit Application",
+  "role": "button",
+  "center": {"x": 200, "y": 300},
+  "state": {"disabled": false}
+}
+```
+- **Semantic**: Has text labels and ARIA roles
+- **State-aware**: Knows if disabled/checked
+- **Accurate**: Exact element boundaries
+
+### Merged Strategy
+```
+1. YOLO provides fast coordinates → "where to click"
+2. DOM provides context → "what it means"
+3. Agent matches probe to DOM element by overlap
+4. Action: Click probe coordinates + verify DOM state
 ```
 
-**Start interactive REPL:**
-```powershell
+---
+
+## Interactive CDP REPL
+
+The CDP REPL is still available for direct control:
+
+```bash
 node scripts/cdp-repl.js
 ```
 
-This opens an interactive prompt:
-```
-cdp [tab-id]> 
-```
+| Command | Description |
+|---------|-------------|
+| `world` | Get DOM elements (action map) |
+| `ss` | Take screenshot |
+| `click X Y` | Click at coordinates |
+| `type TEXT` | Type text |
+| `press KEY` | Press Enter, Tab, etc |
 
 ---
 
-## Interactive Commands
-
-| Category | Command | Description |
-|----------|---------|-------------|
-| **Tabs** | `tabs` | List all open tabs |
-| | `new [url]` | Open new tab |
-| | `switch <id\|index>` | Switch to tab by ID or index |
-| | `close [id]` | Close tab |
-| **Navigation** | `goto <url>` | Navigate to URL |
-| | `screenshot` | Save to `.agent/artifacts/capture.png` |
-| | `viewport` | Get viewport size |
-| **Input** | `click <x> <y>` | Click at coordinates |
-| | `hover <x> <y>` | Move mouse |
-| | `type <text>` | Type text |
-| | `press <key>` | Press key (Enter, Tab, Escape, etc.) |
-| | `scroll <x> <y>` | Scroll page |
-| **Perception** | `world` | Scan page for interactive elements (Action Map) |
-| **Other** | `eval <js>` | Execute JavaScript |
-| | `wait <ms>` | Wait milliseconds |
-| | `help` | Show all commands |
-| | `exit` | Exit REPL |
-
-**Shortcuts:** `ss` = screenshot, `nav` = goto, `vp` = viewport, `w` = world, `q` = exit
-
----
-
-## World State (Action Map)
-
-The `world` command scans the current page for **interactive elements** and outputs a structured **Action Map** to `output/world.json`.
-
-### What it detects
-
-- Buttons, links, inputs, selects, textareas
-- Elements with interactive roles (`button`, `link`, `menuitem`, `tab`, `checkbox`, `radio`)
-- Elements with `onclick` handlers or `tabindex`
-
-### Output format
-
-```json
-{
-  "timestamp": "2026-01-30T23:00:00Z",
-  "viewport": { "width": 400, "height": 640 },
-  "cursor": { "x": 0, "y": 0 },
-  "elementCount": 15,
-  "elements": [
-    {
-      "id": "el_0",
-      "label": "Sign In",
-      "role": "button",
-      "type": "button",
-      "rect": { "x": 100, "y": 200, "width": 80, "height": 30 },
-      "center": { "x": 140, "y": 215 },
-      "state": { "disabled": false, "checked": false, "expanded": false, "selected": false },
-      "occluded": false,
-      "tag": "button"
-    }
-  ]
-}
-```
-
-### Key fields
-
-| Field | Description |
-|-------|-------------|
-| `id` | Unique element ID (`el_0`, `el_1`, etc.) |
-| `label` | Human-readable text (aria-label, title, innerText) |
-| `role` | Element role (button, link, input, etc.) |
-| `rect` | Pixel coordinates and size |
-| `center` | Center point for clicking |
-| `state` | Interactive states (disabled, checked, etc.) |
-| `occluded` | True if element is blocked by another element |
-
----
-
-## Screenshot Notes
-
-- **Always saves to `.agent/artifacts/capture.png`** (replaces previous screenshot)
-- Saved at **1x scale** (no modifications)
-- Original aspect ratio preserved
-- Format: PNG (lossless)
-- Size: 400×640 pixels (matches viewport)
-
----
-
-## Example Interactive Session
+## Workflow: Job Application
 
 ```
-cdp [no tab]> tabs
-📑 Open Tabs:
-  [0] ABC123...
-      Title: New Tab
-      URL: chrome://newtab
-
-cdp [no tab]> switch 0
-✅ Switched to tab: ABC123...
-
-cdp [ABC123...]> goto google.com
-✅ Navigating to: https://google.com
-
-cdp [ABC123...]> ss
-✅ Screenshot saved: .agent/artifacts/capture.png (45678 bytes)
-
-cdp [ABC123...]> click 200 300
-✅ Clicked: (200, 300)
-
-cdp [ABC123...]> type hello world
-✅ Typed: "hello world"
-
-cdp [ABC123...]> press Enter
-✅ Pressed: Enter
-
-cdp [ABC123...]> exit
-👋 Goodbye!
+┌─────────────────────────────────────────────────────────────────────┐
+│  YOLO Vision Loop (runs continuously at 30-60 Hz)                   │
+│                                                                     │
+│  Frame → Detect Probes → Track → Update World State                │
+│                                                                     │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  FSM Action Loop (runs at 5-10 Hz)                                  │
+│                                                                     │
+│  State: FIND_APPLY                                                  │
+│    ├─ Score probes by keywords ["apply", "apply now"]               │
+│    ├─ Best probe: id=5, score=8.2                                   │
+│    └─ Action: CLICK probe at (0.45, 0.32)                           │
+│                                                                     │
+│  State: FILL_FORM                                                   │
+│    ├─ Detect input fields                                           │
+│    ├─ Match to DOM for labels                                       │
+│    └─ Action: TYPE into input                                       │
+│                                                                     │
+│  State: SUBMIT                                                      │
+│    ├─ Find submit button                                            │
+│    └─ Action: CLICK                                                 │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Single Command Mode (for scripting)
+## Latency Comparison
 
-You can also run single commands non-interactively:
-```powershell
-node scripts/cdp-repl.js goto google.com
-node scripts/cdp-repl.js ss
+| Approach | Screenshot + LLM | DOM Query | YOLO Streaming |
+|----------|------------------|-----------|----------------|
+| Detection | 1-3 seconds | 50-100ms | <16ms |
+| Per action | 2-5 seconds | 100-200ms | <50ms |
+| Real-time | ❌ | ❌ | ✅ |
+| Visual accuracy | Medium | N/A | High |
+| Semantic context | High | High | Low (add DOM) |
+
+**YOLO + DOM = Best of both worlds**
+
+---
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `YOLO/main.py` | Main agent entry point |
+| `YOLO/debug_visualizer.py` | Bounding box overlay |
+| `YOLO/world_state.py` | Live state management |
+| `YOLO/fsm.py` | Job application state machine |
+| `scripts/cdp-repl.js` | Interactive browser control |
+
+---
+
+## Usage Examples
+
+### Run with Debug Visualization
+```bash
+python YOLO/main.py --debug --url "https://linkedin.com/jobs"
+```
+
+### Get Current Probes (Python)
+```python
+from YOLO import VisionAgent
+agent = VisionAgent(debug=True)
+await agent.start()
+
+# Access live probes
+world = agent.world_manager.get_state()
+for probe in world.probes:
+    print(f"Probe {probe['id']}: {probe['type']} at ({probe['cx']}, {probe['cy']})")
+```
+
+### Combine with CDP REPL
+```
+# Terminal 1: Run YOLO agent
+python YOLO/main.py --debug
+
+# Terminal 2: Use CDP REPL for manual control
+node scripts/cdp-repl.js
+cdp> world        # Get DOM elements
+cdp> click 200 300  # Click at probe location
 ```
 
 ---
 
 ## Notes
 
-- The REPL auto-connects to the first available tab on startup
-- Use `switch` with tab index (0, 1, 2...) or full tab ID
-- Screenshots are 1x scale with no modifications
-- Viewport is fixed at 400×640 pixels (portrait)
+- YOLO runs as a **background process** streaming probes
+- CDP REPL can run **alongside** for manual intervention
+- Press **ESC** in debug window to stop
+- Probes have **stable IDs** - same button keeps same ID across frames
