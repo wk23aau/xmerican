@@ -34,6 +34,8 @@ from world_state import WorldState, get_world_state, ObjectSource
 from overlay import OverlayRenderer
 from roi_mask import ROIMask, get_roi_mask
 from perception_loop import PerceptionLoop, create_perception_loop
+from tracker import get_tracker
+from streaming_vision import StreamingVision
 
 
 class xClick:
@@ -51,16 +53,21 @@ class xClick:
         self.overlay: Optional[OverlayRenderer] = None  # Live visual overlay
         self.roi = get_roi_mask()  # Region of interest filtering
         self.perception_loop: Optional[PerceptionLoop] = None  # Continuous perception
+        self.streaming_vision: Optional[StreamingVision] = None  # Background streaming for instant reflexes
         
     async def connect(self):
         """Connect to browser"""
         print("Connecting to browser...")
-        await self.cdp.connect(set_viewport=True)
+        # Don't set viewport - Chrome is launched with correct --window-size
+        await self.cdp.connect(set_viewport=False)
         print("Connected!")
         
         # Initialize visual cursor (green circle follows mouse)
         await self.cdp.init_cursor_visual()
         print("✓ Visual cursor enabled")
+        
+        # Validate viewport matches expectations
+        await self._validate_viewport()
         
         # Initialize vision module if enabled
         if self.vision_enabled:
@@ -73,7 +80,7 @@ class xClick:
         self.overlay = OverlayRenderer(self.cdp)
             
     async def init_vision(self):
-        """Initialize YOLO vision module"""
+        """Initialize YOLO vision module with streaming for instant reflexes"""
         try:
             from vision_module import VisionModule
             self.vision_module = VisionModule(
@@ -86,12 +93,37 @@ class xClick:
             await self.vision_module.init_model()
             self.vision_enabled = True
             print("✓ Vision module initialized")
+            
+            # Initialize streaming vision for instant reflexes
+            tracker = get_tracker()
+            self.streaming_vision = StreamingVision(
+                self.vision_module, 
+                tracker,
+                update_interval=0.8  # YOLO every ~800ms, predict between
+            )
+            await self.streaming_vision.start()
+            print("✓ Streaming vision started (instant reflexes enabled)")
+            
         except ImportError as e:
             print(f"✗ Vision module not available: {e}")
             self.vision_enabled = False
         except Exception as e:
             print(f"✗ Vision init failed: {e}")
             self.vision_enabled = False
+    
+    async def _validate_viewport(self):
+        """Validate viewport matches config expectations, warn if mismatch"""
+        try:
+            metrics = await self.cdp.send("Page.getLayoutMetrics")
+            visual = metrics.get("result", {}).get("visualViewport", {})
+            actual_w = int(visual.get("clientWidth", 0))
+            actual_h = int(visual.get("clientHeight", 0))
+            
+            if abs(actual_w - VIEWPORT_WIDTH) > 50 or abs(actual_h - VIEWPORT_HEIGHT) > 50:
+                print(f"⚠️  VIEWPORT MISMATCH: Expected {VIEWPORT_WIDTH}x{VIEWPORT_HEIGHT}, got {actual_w}x{actual_h}")
+                print(f"   Clicks may land incorrectly. Try resizing Chrome window or relaunch.")
+        except Exception as e:
+            print(f"⚠️  Could not validate viewport: {e}")
     
     async def init_motion_controller(self):
         """Initialize motion controller for smooth mouse movement"""
@@ -243,28 +275,55 @@ class xClick:
         print("─────────────────────────────\n")
         
     async def vclick_text(self, query: str) -> bool:
-        """Find and click element by vision label"""
+        """Find and click element by vision label - uses streaming for instant reflexes!"""
         if not self.vision_enabled or not self.vision_module:
             print("✗ Vision not enabled. Run with --vision flag")
             return False
+        
+        # INSTANT PATH: Use streaming prediction if available
+        if self.streaming_vision and self.streaming_vision.is_running:
+            import time
+            t_start = time.perf_counter()
+            result = self.streaming_vision.find_by_text(query)
+            t_lookup = (time.perf_counter() - t_start) * 1000
             
-        # Refresh if no probes
+            if result:
+                label, cx_css, cy_css = result  # Already CSS-scaled by streaming_vision
+                await self.cdp.mouse_click(int(cx_css), int(cy_css))
+                print(f"✓ vclick '{label}' ({cx_css:.0f}, {cy_css:.0f}) [instant: {t_lookup:.1f}ms]")
+                return True
+            else:
+                # Element not in streaming cache - wait for next detection
+                print(f"  [stream] '{query}' not cached, waiting for detection...")
+                await asyncio.sleep(1.0)  # Wait for streaming to pick it up
+                result = self.streaming_vision.find_by_text(query)
+                if result:
+                    label, cx_css, cy_css = result  # Already CSS-scaled
+                    await self.cdp.mouse_click(int(cx_css), int(cy_css))
+                    print(f"✓ vclick '{label}' ({cx_css:.0f}, {cy_css:.0f})")
+                    return True
+            
+        # FALLBACK: Full detection if streaming not available
         if not self.vision_probes:
             await self.refresh_vision_probes()
             
-        # Find by label
         probe = self.vision_module.find_probe_by_label(self.vision_probes, query)
         
         if not probe:
-            # Retry with fresh detection
             await self.refresh_vision_probes()
             probe = self.vision_module.find_probe_by_label(self.vision_probes, query)
             
         if probe:
-            cx, cy = int(probe.cx), int(probe.cy)
+            # Convert YOLO coords (screenshot space) to CSS coords for clicks
+            device_scale = getattr(self.vision_module, 'device_scale', 1.0)
+            cx = int(probe.cx / device_scale)
+            cy = int(probe.cy / device_scale)
             await self.cdp.mouse_click(cx, cy)
             label_str = f"'{probe.label}'" if probe.label else f"({probe.type})"
-            print(f"✓ vclick {label_str} ({cx}, {cy})")
+            if device_scale != 1.0:
+                print(f"✓ vclick {label_str} ({cx}, {cy}) [/{device_scale:.1f}x]")
+            else:
+                print(f"✓ vclick {label_str} ({cx}, {cy})")
             return True
             
         print(f"✗ not found: '{query}'")
@@ -442,6 +501,12 @@ class xClick:
 ║   vscan          - Save debug screenshot  ║
 ║   timing         - Show latency stats     ║
 ║   vision         - Enable vision mode     ║
+║   stream [cmd]   - Streaming vision ctrl  ║
+║                                           ║
+║ Instant Reflexes: (background streaming)  ║
+║   stream status  - Show streaming status  ║
+║   stream list    - List tracked elements  ║
+║   stream predict - Predict element pos    ║
 ║                                           ║
 ║ Smooth Motion: (human-like movement)      ║
 ║   seek <text>    - Smooth move to element ║
@@ -555,6 +620,44 @@ class xClick:
                         await self.init_vision()
                     else:
                         print("✓ Vision already enabled")
+                # ===== STREAMING COMMANDS (instant reflexes) =====
+                elif action == "stream":
+                    if not self.vision_enabled:
+                        print("✗ Vision not enabled. Run with --vision flag")
+                    elif not self.streaming_vision:
+                        print("✗ Streaming not initialized")
+                    else:
+                        subargs = args.split()
+                        subcmd = subargs[0] if subargs else "status"
+                        
+                        if subcmd == "start":
+                            if not self.streaming_vision.is_running:
+                                await self.streaming_vision.start()
+                            else:
+                                print("✓ Streaming already running")
+                        elif subcmd == "stop":
+                            await self.streaming_vision.stop()
+                        elif subcmd == "status":
+                            print(f"\n─── STREAMING STATUS ───")
+                            print(f"  {self.streaming_vision.status()}")
+                            print(f"───────────────\n")
+                        elif subcmd in ("list", "show"):
+                            print(f"\n─── TRACKED ELEMENTS ───")
+                            print(self.streaming_vision.list_elements())
+                            print(f"───────────────\n")
+                        elif subcmd == "predict":
+                            # Show predicted position for a label
+                            label = " ".join(subargs[1:]) if len(subargs) > 1 else ""
+                            if label:
+                                pos = self.streaming_vision.get_position(label)
+                                if pos:
+                                    print(f"  '{label}' → ({pos[0]:.0f}, {pos[1]:.0f})")
+                                else:
+                                    print(f"  '{label}' not found")
+                            else:
+                                print("  Usage: stream predict <label>")
+                        else:
+                            print("  Usage: stream [start|stop|status|list|predict <label>]")
                 # ===== SMOOTH MOTION COMMANDS (ChatGPT recommendation) =====
                 elif action == "seek":
                     # Smoothly move to element without clicking

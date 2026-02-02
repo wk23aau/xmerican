@@ -4,9 +4,14 @@
 CDP_HOST = "127.0.0.1"
 CDP_PORT = 9222
 
-# Viewport
+# Viewport (internal page size)
 VIEWPORT_WIDTH = 1280
 VIEWPORT_HEIGHT = 720
+
+# Chrome window size (includes browser chrome: address bar, tabs, etc.)
+# Chrome typically adds ~85px for UI chrome on top
+CHROME_WINDOW_WIDTH = VIEWPORT_WIDTH
+CHROME_WINDOW_HEIGHT = VIEWPORT_HEIGHT + 85  # Add chrome height
 
 # Vision Settings
 # Model type options:

@@ -213,19 +213,26 @@ class VisionModule:
             actual_h = int(visual.get("clientHeight", VIEWPORT_HEIGHT))
             self.dpr = float(visual.get("scale", 1.0))
             
-            # Use configured size if browser ignores emulation (non-headless)
-            # This fixes the 2x capture bug when Chrome ignores setDeviceMetricsOverride
-            if actual_w > VIEWPORT_WIDTH * 1.5 or actual_h > VIEWPORT_HEIGHT * 1.5:
-                self.viewport_w = VIEWPORT_WIDTH
-                self.viewport_h = VIEWPORT_HEIGHT
-                print(f"  [vp] browser={actual_w}x{actual_h} → capture={self.viewport_w}x{self.viewport_h}")
-            else:
-                self.viewport_w = actual_w
-                self.viewport_h = actual_h
+            # Store browser actual size for coordinate scaling
+            self.browser_width = actual_w
+            self.browser_height = actual_h
+            
+            # SIMPLIFIED: Just use actual browser size everywhere
+            # YOLO runs on actual screenshot, coords match DOM CSS pixels
+            self.viewport_w = actual_w
+            self.viewport_h = actual_h
+            self.scale_x = 1.0  # No scaling needed!
+            self.scale_y = 1.0
+            if not hasattr(self, '_viewport_logged'):
                 print(f"  [vp] {self.viewport_w}x{self.viewport_h} dpr={self.dpr}")
+                self._viewport_logged = True
         except:
             self.viewport_w = VIEWPORT_WIDTH
             self.viewport_h = VIEWPORT_HEIGHT
+            self.browser_width = VIEWPORT_WIDTH
+            self.browser_height = VIEWPORT_HEIGHT
+            self.scale_x = 1.0
+            self.scale_y = 1.0
             
         # Capture screenshot at configured size
         result = await self.cdp.send("Page.captureScreenshot", {
@@ -244,6 +251,27 @@ class VisionModule:
             return None, self.dpr, self.viewport_w, self.viewport_h
             
         png_bytes = base64.b64decode(data)
+        
+        # Get actual image dimensions - this is what YOLO will see
+        from io import BytesIO
+        from PIL import Image
+        img = Image.open(BytesIO(png_bytes))
+        actual_img_w, actual_img_h = img.width, img.height
+        
+        # Calculate device scale: screenshot pixels / CONFIG viewport pixels
+        # DOM getBoundingClientRect returns coords relative to CONFIG viewport
+        # YOLO coords are in screenshot space, clicks need CSS space
+        device_scale = actual_img_w / VIEWPORT_WIDTH
+            
+        # Store for coordinate conversion (YOLO → CSS)
+        self.device_scale = device_scale
+        self.screenshot_w = actual_img_w
+        self.screenshot_h = actual_img_h
+        
+        if not hasattr(self, '_device_scale_logged') and device_scale != 1.0:
+            print(f"  [capture] Screenshot={actual_img_w}x{actual_img_h}, Config={VIEWPORT_WIDTH}x{VIEWPORT_HEIGHT} → scale={device_scale:.1f}x")
+            self._device_scale_logged = True
+        
         return png_bytes, self.dpr, self.viewport_w, self.viewport_h
         
     def detect_objects(self, png_bytes: bytes, confidence: float = 0.25) -> List[Dict]:
@@ -263,6 +291,11 @@ class VisionModule:
         # Convert to numpy array
         img = Image.open(BytesIO(png_bytes))
         frame = np.array(img)
+        
+        # DEBUG: Log actual image size fed to YOLO
+        if not hasattr(self, '_img_size_logged'):
+            print(f"  [yolo] Image size: {frame.shape[1]}x{frame.shape[0]}")
+            self._img_size_logged = True
         
         # Run YOLO
         results = self.model(frame, conf=confidence, verbose=False)
@@ -399,12 +432,35 @@ class VisionModule:
         return value or {}
         
     def px_to_css(self, px_x: float, px_y: float) -> Tuple[float, float]:
-        """Convert pixel coordinates to CSS coordinates"""
-        return px_x / self.dpr, px_y / self.dpr
+        """Convert pixel (screenshot/YOLO) coordinates to CSS coordinates for clicking.
+        
+        Uses device_scale which is calculated from screenshot_width / VIEWPORT_WIDTH.
+        """
+        scale = getattr(self, 'device_scale', self.dpr)  # Use device_scale if available
+        return px_x / scale, px_y / scale
         
     def css_to_px(self, css_x: float, css_y: float) -> Tuple[float, float]:
         """Convert CSS coordinates to pixel coordinates"""
-        return css_x * self.dpr, css_y * self.dpr
+        scale = getattr(self, 'device_scale', self.dpr)
+        return css_x * scale, css_y * scale
+    
+    def get_css_coords(self, screenshot_x: float, screenshot_y: float) -> Tuple[float, float]:
+        """
+        Convert screenshot/YOLO coordinates to CSS pixel coordinates for clicking.
+        
+        This is the CANONICAL method for coordinate conversion in xCLICK.
+        Use this when you have coordinates from YOLO detection (screenshot space)
+        and need to dispatch mouse clicks via CDP (CSS space).
+        
+        Args:
+            screenshot_x: X coordinate in screenshot/YOLO space
+            screenshot_y: Y coordinate in screenshot/YOLO space
+            
+        Returns:
+            (css_x, css_y) coordinates suitable for CDP mouse events
+        """
+        device_scale = getattr(self, 'device_scale', 1.0)
+        return (screenshot_x / device_scale, screenshot_y / device_scale)
         
     async def detect_labeled_probes(self, confidence: float = 0.25, verbose: bool = False) -> List[LabeledProbe]:
         """

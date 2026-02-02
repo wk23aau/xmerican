@@ -285,6 +285,35 @@ class CDPClient:
             "scroll_x": float(visual.get("pageX", 0)),
             "scroll_y": float(visual.get("pageY", 0)),
         }
+    
+    async def get_chrome_ui_height(self) -> int:
+        """
+        Dynamically detect Chrome UI chrome height (tabs, address bar, bookmarks).
+        
+        This replaces the hardcoded 85px assumption in config.py and provides
+        accurate measurements regardless of Chrome version, OS, or UI configuration.
+        
+        Returns:
+            Height in pixels of Chrome UI elements above the viewport
+        """
+        try:
+            # Get outer window bounds
+            window_info = await self.send("Browser.getWindowBounds", {"windowId": 1})
+            outer_height = window_info.get("result", {}).get("bounds", {}).get("height", 0)
+            
+            # Get inner viewport height
+            metrics = await self.send("Page.getLayoutMetrics")
+            inner_height = metrics.get("result", {}).get("visualViewport", {}).get("clientHeight", 0)
+            
+            if outer_height > 0 and inner_height > 0:
+                chrome_height = outer_height - inner_height
+                return max(0, chrome_height)
+        except Exception:
+            pass
+        
+        # Fallback to config value
+        from config import CHROME_WINDOW_HEIGHT, VIEWPORT_HEIGHT
+        return CHROME_WINDOW_HEIGHT - VIEWPORT_HEIGHT
         
     async def probe_element_at(self, css_x: float, css_y: float) -> dict:
         """Query DOM element at CSS coordinates"""
